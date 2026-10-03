@@ -73,7 +73,6 @@ function EntryView({ e, newest }: { e: Entry; newest: boolean }) {
   return (
     <li className={`msg assistant ${e.status ?? ''}`}>
       <span className="msg-mode">
-        <i className="led" style={{ ['--c' as string]: e.mode === 'live' ? 'var(--signal)' : e.mode === 'guided' ? 'var(--angle)' : 'var(--text-3)' } as React.CSSProperties} />
         {MODE_TAG[e.mode ?? 'scripted']}
       </span>
       {e.receipts?.length ? (
@@ -89,7 +88,7 @@ function EntryView({ e, newest }: { e: Entry; newest: boolean }) {
                   if (t) store.dispatch({ type: 'HIGHLIGHT', target: t });
                 }}
               >
-                <i className="led" /> {r.replace(/\.$/, '')}
+                {r.replace(/\.$/, '')}
               </button>
             </li>
           ))}
@@ -158,11 +157,11 @@ export function InvestigationPanel() {
         {c.ai.checked ? (
           c.ai.available ? (
             <span className="mode-tag" tabIndex={0} title={`Claude${c.ai.model ? ` (${c.ai.model})` : ''} can update your scenario and explain the results.`}>
-              <i className="led breathe" style={{ ['--c' as string]: 'var(--signal)' } as React.CSSProperties} /> Live AI
+              Live AI
             </span>
           ) : (
             <span className="mode-tag" tabIndex={0} title="Built-in questions update the scenario with scripted explanations. Live AI is unavailable.">
-              <i className="led" style={{ ['--c' as string]: 'var(--text-3)' } as React.CSSProperties} /> Scripted
+              Scripted
             </span>
           )
         ) : (

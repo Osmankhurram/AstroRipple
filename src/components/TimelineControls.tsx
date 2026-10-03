@@ -100,7 +100,7 @@ export function TimelineControls() {
       <header className="deck-toolbar">
         <div className="deck-heading">
           <h2 id="controls-heading">
-            <i className="led" style={{ ['--c' as string]: COLORS.experiment } as React.CSSProperties} /> Experiment
+            Experiment
           </h2>
           <InfoTip label="About the experiment">Every control changes only the experiment copy. The baseline stays fixed, so the comparison is always against the original plan.</InfoTip>
         </div>
@@ -166,7 +166,6 @@ export function TimelineControls() {
                 title={ORBIT_PRESET_INFO[p].help}
                 onClick={() => act({ type: 'SET_ORBIT_PRESET', preset: p })}
               >
-                {st.experiment.orbitPreset === p && <i className="led" style={{ ['--c' as string]: COLORS.experiment } as React.CSSProperties} />}
                 <span>{PRESET_NAME[p]}</span>
                 <span className="deg">{ORBIT_PRESET_INFO[p].inclinationDeg}°</span>
               </button>
@@ -177,7 +176,7 @@ export function TimelineControls() {
           <div className="deck-head">
             <label className="label plain" htmlFor="site">Launch site</label>
             <InfoTip label="About launch-site changes">Curated locations only. The target plane and baseline time stay fixed. A site change in the model does not mean the same rocket or mission could use that site.</InfoTip>
-            {siteChanged && <i className="led" style={{ ['--c' as string]: COLORS.experiment } as React.CSSProperties} title="Differs from baseline" />}
+            {siteChanged && <span className="tag" title="Differs from the baseline site">changed</span>}
           </div>
           <select id="site" className="field" value={st.experiment.launchSiteId} onChange={(e) => act({ type: 'SET_LAUNCH_SITE', siteId: e.target.value })}>
             {Object.values(LAUNCH_SITES).map((s) => (

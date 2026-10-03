@@ -192,7 +192,6 @@ export function ComparisonView() {
               style={{ ['--seg-c' as string]: o.c } as React.CSSProperties}
               onClick={() => choose(o.v)}
             >
-              <i className="led" style={{ ['--c' as string]: o.c } as React.CSSProperties} />
               {o.label}
             </button>
           ))}

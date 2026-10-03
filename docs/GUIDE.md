@@ -23,7 +23,7 @@ launch guidance.
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │ AstroRipple · what-if launch lab                       Guide  Reset  ▶ Tour  │  top bar
 ├──────────────────────────────────────────────────────────────────────────────┤
-│ ● Detective-1  │  T−02:14:09        │ Window A 21:45 ▲Yellow │ Window B …   │  telemetry rail
+│ NEXT WINDOW  T−02:14:09       │ WINDOW A 21:45  ▲Yellow │ WINDOW B 00:45 ●Green │  telemetry rail
 ├──────────────────────────────────────────────┬───────────────────────────────┤
 │ [Compare|Baseline|Experiment] [Satellite Mode] (⊖ ⌖ ⊘ ≡) [◉ Best view] │ Ask │
 │ ┌──────────────────────────────────────────┐ │  conversation             │
@@ -49,7 +49,6 @@ strip, then the controls. Explanations sit behind the small **ⓘ** buttons, and
 ### Telemetry rail (Track 2: countdown + weather)
 | Element | What it means |
 |---|---|
-| **Detective‑1 · DEMO** | The fictional demo mission. The tag says where the data comes from. |
 | **T−hh:mm:ss** | A live countdown on your clock to the next *supplied* launch window. It **never** changes when you run a what‑if. |
 | **Window A / B** | The two windows supplied with the mission. AstroRipple compares them and never invents new ones. |
 | **Weather light** ●/▲/■ | Green, yellow or red from a teaching heuristic using gusts, rain probability and cloud. **Click the light** to see the inputs and the rule that fired. |

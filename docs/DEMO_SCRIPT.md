@@ -30,7 +30,7 @@ npm run build && npm start        # http://localhost:3000, full-screen browser
 
 | Time | Do | Say |
 |---|---|---|
-| 0:00 | Land on the page. Point at the telemetry rail. | "Detective‑1 is a fictional mission, tagged DEMO. The countdown runs on the real clock. Window A's weather light is yellow." |
+| 0:00 | Land on the page. Point at the telemetry rail. | "This is a fictional demo mission. The countdown runs on the real clock. Window A's weather light is yellow." |
 | 0:12 | **Click the yellow light.** | "Gusts of 36 km/h trip the yellow rule. These are teaching thresholds, not launch rules, and every light explains itself." |
 | 0:25 | **▶ Tour** (top right). Let step 1 run, then click **Next**. | "The tinted disc is the orbit we're aiming for. At launch it passes right over the site: zero degrees." |
 | 0:35 | Step 2: pick **Different**. | "Predict first: if we wait three hours, does Earth's rotation equal how far the site ends up from the plane?" |

@@ -266,15 +266,14 @@ export function SatelliteToolbar() {
   const sat = st.satellite;
   const rt = useSatRuntime();
   const entry = rt.catalogs[sat.catalogId];
-  const synthetic = CATALOGS[sat.catalogId].synthetic;
   return (
     <div className="sat-toolbar" role="group" aria-label="Satellite Mode controls">
       <div className="seg" role="radiogroup" aria-label="Time source">
         <button type="button" role="radio" aria-checked={sat.timeSource === 'now'} onClick={() => satAct({ type: 'SAT_SET_TIME_SOURCE', mode: 'now' })} title={LABELS.now}>
-          <i className="led breathe" style={{ ['--c' as string]: 'var(--live)' } as React.CSSProperties} /> Now
+          Now
         </button>
         <button type="button" role="radio" aria-checked={sat.timeSource === 'scenario'} onClick={() => satAct({ type: 'SAT_SET_TIME_SOURCE', mode: 'scenario' })} title={LABELS.scenario}>
-          <i className="led" style={{ ['--c' as string]: 'var(--experiment)' } as React.CSSProperties} /> Scenario
+          Scenario
         </button>
       </div>
       <span className="grow" />
@@ -296,7 +295,6 @@ export function SatelliteToolbar() {
       <DisplayPopover />
       <SourcePopover />
       {entry?.status === 'loading' && <span className="fine" role="status">Loading…</span>}
-      {synthetic && <span className="prov-tag demo" title={`Fictional objects at demonstration time ${fmtDateTimeUtc(SYNTHETIC_EPOCH_MS)}`}>Synthetic demo</span>}
     </div>
   );
 }

@@ -4,11 +4,11 @@
  * light is itself the button that opens its evidence (progressive disclosure, no extra "why" text).
  */
 import { useEffect, useState } from 'react';
-import { LAUNCH_SITES, type LaunchWindow } from '@/data/demoMission';
+import type { LaunchWindow } from '@/data/demoMission';
 import { computeMetrics } from '@/simulation/metrics';
 import { countdown, fmtUtc, formatCountdown } from '@/state/clock';
 import { store, useInvestigation } from '@/state/store';
-import { InfoTip, Popover, ProvenanceDot } from './ui';
+import { Popover } from './ui';
 import { ThresholdHelp, WeatherDetails } from './WeatherIndicator';
 
 const ICON = { green: '●', yellow: '▲', red: '■', unknown: '?' } as const;
@@ -112,30 +112,10 @@ function WindowCell({ w, className }: { w: LaunchWindow; className: string }) {
   );
 }
 
-function Identity() {
-  const st = useInvestigation();
-  const site = LAUNCH_SITES[st.mission.defaultSiteId];
-  return (
-    <div className="rail-cell ident">
-      <span className="mission-name">
-        <i className="led breathe" /> Detective-1
-      </span>
-      <span className="row">
-        <ProvenanceDot p={st.mission.scheduleProvenance} label="Schedule" />
-        <span className="window-date">{site.shortName}</span>
-        <InfoTip label="About the mission">
-          <strong>{st.mission.name}</strong> — {site.name}, {st.mission.vehicle.toLowerCase()}. Mission, windows and weather are fictional demonstration data.
-        </InfoTip>
-      </span>
-    </div>
-  );
-}
-
 export function MissionStrip() {
   const st = useInvestigation();
   return (
     <section className="rail" aria-label="Launch status">
-      <Identity />
       <Countdown />
       <WindowCell w={st.mission.windows[0]} className="win-a" />
       <WindowCell w={st.mission.windows[1]} className="win-b" />
