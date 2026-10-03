@@ -18,7 +18,7 @@ import {
   type ScenarioId,
 } from '../simulation/scenario';
 
-export type FocusTarget = 'launch-site' | 'orbital-plane' | 'weather' | 'overview' | 'satellite' | 'encounter';
+export type FocusTarget = 'launch-site' | 'orbital-plane' | 'weather' | 'overview' | 'satellite' | 'encounter' | 'viewing';
 export type HighlightTarget = 'delay' | 'orbit' | 'site' | 'angle' | 'rotation' | 'weather' | 'windows' | 'plane' | null;
 
 export interface ViewState {
@@ -41,6 +41,8 @@ export interface ViewState {
   transitionUntil: number;
   /** Simulated seconds per real second for playback. */
   playbackSpeed: number;
+  /** "Best view" overlay: suggested viewing spot, sight line, and spectator camera. */
+  viewing: boolean;
 }
 
 export const PLAYBACK_SPEEDS = [1, 5, 20, 60, 300] as const;
@@ -98,7 +100,8 @@ export type ViewAction =
   | { type: 'SET_PLAYBACK'; seconds: number }
   | { type: 'TOGGLE'; key: 'syncCameras' | 'showAxis' | 'showEquator' | 'reducedMotion' }
   | { type: 'SET_REDUCED_MOTION'; value: boolean }
-  | { type: 'SET_PLAYBACK_SPEED'; speed: number };
+  | { type: 'SET_PLAYBACK_SPEED'; speed: number }
+  | { type: 'SET_VIEWING'; on: boolean };
 
 export type SatelliteAction =
   | { type: 'SAT_SET_ENABLED'; enabled: boolean }
@@ -148,6 +151,7 @@ export function initialState(nowMs: number, mission: Mission = buildDemoMission(
       transitionNonce: 0,
       transitionUntil: 0,
       playbackSpeed: 300,
+      viewing: false,
     },
     appliedRequestIds: [],
     satellite: initialSatelliteState(),
@@ -295,6 +299,10 @@ export function reduceWithResult(state: InvestigationState, action: Action, nowM
       return { state: { ...state, view: { ...state.view, [action.key]: !state.view[action.key] } } };
     case 'SET_REDUCED_MOTION':
       return { state: { ...state, view: { ...state.view, reducedMotion: action.value } } };
+    case 'SET_VIEWING': {
+      if (!action.on) return { state: { ...state, view: { ...state.view, viewing: false, focus: state.view.focus === 'viewing' ? 'overview' : state.view.focus, focusNonce: state.view.focus === 'viewing' ? state.view.focusNonce + 1 : state.view.focusNonce } } };
+      return { state: { ...state, view: { ...state.view, viewing: true, focus: 'viewing', focusNonce: state.view.focusNonce + 1 } } };
+    }
     case 'SET_PLAYBACK_SPEED': {
       if (!(PLAYBACK_SPEEDS as readonly number[]).includes(action.speed)) return { state, error: `Playback speed must be one of ${PLAYBACK_SPEEDS.join(', ')}.` };
       return { state: { ...state, view: { ...state.view, playbackSpeed: action.speed } } };

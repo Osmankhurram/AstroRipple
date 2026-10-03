@@ -219,7 +219,7 @@ orbits with drag ignored:
 | SYN‑C | crosses the ascent's T+250 s point 120 s after the rocket | 315 km: crossing paths, different times |
 | SYN‑D | same lat/lon as the rocket at T+300 s, 300 km higher | 299 km: same map spot, different altitude |
 
-The guided tour (*▶ Synthetic encounter demo*) narrates only numbers returned by the tools.
+The guided tour (*▶ Synthetic demo*) narrates only numbers returned by the tools.
 
 ## Not implemented / not claimed
 

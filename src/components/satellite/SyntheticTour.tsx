@@ -44,7 +44,7 @@ interface Step {
 
 const STEPS: Step[] = [
   {
-    title: 'Fictional objects, fixed demo time',
+    title: 'Fictional objects',
     run: async () => {
       apply([
         { type: 'RESET_EXPERIMENT' },
@@ -57,8 +57,8 @@ const STEPS: Step[] = [
       if (!o.ok) return say(`Could not start the demonstration: ${o.receipt}`);
       const b = (res(o).runs as Run[])[0];
       say(
-        'Synthetic demonstration: four fictional objects (SYN-A…D) at a fixed demonstration time, screened against the illustrative ascent.',
-        b.minimum ? `Computed: the closest fictional object to the baseline ascent is ${b.minimum.name} at ${fmtKm(b.minimum.separationKm)}, T+${Math.round(b.minimum.elapsedSec)} s. ${RESULT_DISCLAIMER}` : RESULT_DISCLAIMER,
+        b.minimum ? `Four fictional objects. Closest to the baseline climb: ${b.minimum.name.replace(' (fictional)', '')}, ${fmtKm(b.minimum.separationKm)}.` : 'Four fictional objects, screened against the climb.',
+        RESULT_DISCLAIMER,
         [o.receipt],
       );
     },
@@ -70,8 +70,8 @@ const STEPS: Step[] = [
       if (!o.ok) return say(o.receipt);
       const r = res(o);
       say(
-        `${String(r.classification)}: ${String(r.object)} comes within ${fmtKm(r.separationKm as number)} of the rocket at T+${r.elapsedSec as number} s.`,
-        'Temporal coincidence: both are near the same point at the same instant. The magenta connector is the separation computed at that instant; the translucent sphere is the screening distance, not the size of either object.',
+        `${String(r.object).replace(' (fictional)', '')} passes ${fmtKm(r.separationKm as number)} from the rocket at T+${r.elapsedSec as number} s.`,
+        'Same place, same moment. Magenta line = live distance; sphere = screening distance, not object size.',
         [o.receipt],
       );
     },
@@ -84,8 +84,8 @@ const STEPS: Step[] = [
       const r = res(o);
       const row = (r.offsets as { minimum: Run['minimum']; sameObjectAsBaselineClosest?: string }[])[0];
       say(
-        row.minimum ? `With a ${SYNTHETIC_DEMO_DELAY_MIN}-minute delay the closest fictional object is ${row.minimum.name}: ${fmtKm(row.minimum.separationKm)} at T+${row.minimum.elapsedSec} s.` : 'Delayed scenario computed.',
-        `${row.sameObjectAsBaselineClosest ?? ''} The rocket flies the same Earth-fixed path, but every object has moved on — so a different object is nearby.`,
+        row.minimum ? `+${SYNTHETIC_DEMO_DELAY_MIN} min: now ${row.minimum.name.replace(' (fictional)', '')} is closest, ${fmtKm(row.minimum.separationKm)}.` : `+${SYNTHETIC_DEMO_DELAY_MIN} min computed.`,
+        'Same path, later. The objects moved on, so a different one is near.',
         [o.receipt],
       );
     },
@@ -97,8 +97,8 @@ const STEPS: Step[] = [
       if (!o.ok) return say(o.receipt);
       const r = res(o);
       say(
-        `Experiment: ${String(r.object)} at ${fmtKm(r.separationKm as number)}, T+${r.elapsedSec as number} s.`,
-        'The delay did not make the launch “safer”: it changed which modelled object came near. One example says nothing general about launch safety.',
+        `${String(r.object).replace(' (fictional)', '')}: ${fmtKm(r.separationKm as number)} at T+${r.elapsedSec as number} s.`,
+        'Not “safer” — just a different object nearby.',
         [o.receipt],
       );
     },
@@ -111,8 +111,8 @@ const STEPS: Step[] = [
       const run = satRuntime.get().run;
       const sep = run.baseline?.perObject['s:SYN-C'];
       say(
-        sep ? `SYN-C crosses the ascent path, yet its closest modelled approach is ${fmtKm(sep.separationKm)} (T+${Math.round(sep.elapsedSec)} s).` : 'SYN-C crosses the ascent path at a different time.',
-        'It reaches the T+250 s point of the path 120 s after the rocket has left it. Screening compares 3D positions at the same instant, never drawn line intersections.',
+        sep ? `SYN-C crosses the path, but never gets closer than ${fmtKm(sep.separationKm)}.` : 'SYN-C crosses the path at a different time.',
+        'It arrives 120 s after the rocket left. Crossing lines ≠ encounter.',
         o.ok ? [o.receipt] : undefined,
       );
     },
@@ -123,8 +123,8 @@ const STEPS: Step[] = [
       const o = tool('select_satellite', { syntheticId: 'SYN-D' });
       const sep = satRuntime.get().run.baseline?.perObject['s:SYN-D'];
       say(
-        sep ? `SYN-D passes over the same latitude and longitude as the rocket at T+300 s, but its closest approach is ${fmtKm(sep.separationKm)}.` : 'SYN-D is over the same map position, far higher.',
-        'It is 300 km higher: overlapping on a 2D map is not a close approach in 3D.',
+        sep ? `SYN-D sits over the same map spot, yet stays ${fmtKm(sep.separationKm)} away.` : 'SYN-D is over the same map spot, far higher.',
+        'It is 300 km higher. Same map spot ≠ close in 3D.',
         o.ok ? [o.receipt] : undefined,
       );
     },
@@ -132,7 +132,7 @@ const STEPS: Step[] = [
   {
     title: 'What this does — and does not — show',
     run: () => {
-      say('Launch timing changes which moving objects a trajectory may approach. A crossing on the globe alone is not a collision prediction.', `${RESULT_DISCLAIMER} Switch the screening set to real catalogs to explore actual cataloged objects; real data may show no approach at all.`);
+      say('Timing changes which objects come near. A crossing on the globe is not a collision.', 'Try a real screening set next — real data may show no approach at all.');
     },
   },
 ];
@@ -160,7 +160,7 @@ export function SyntheticTourButton() {
         }}
         title="Offline guided replay with fictional objects"
       >
-        ▶ Synthetic encounter demo
+        ▶ Synthetic demo
       </button>
     );
   const last = t.step >= STEPS.length - 1;

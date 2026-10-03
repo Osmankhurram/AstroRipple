@@ -266,7 +266,6 @@ export function SatelliteToolbar() {
   const sat = st.satellite;
   const rt = useSatRuntime();
   const entry = rt.catalogs[sat.catalogId];
-  const now = useNow(1000);
   const synthetic = CATALOGS[sat.catalogId].synthetic;
   return (
     <div className="sat-toolbar" role="group" aria-label="Satellite Mode controls">
@@ -278,9 +277,6 @@ export function SatelliteToolbar() {
           <i className="led" style={{ ['--c' as string]: 'var(--experiment)' } as React.CSSProperties} /> Scenario
         </button>
       </div>
-      <span className="sat-clock mono" aria-live="off">
-        {sat.timeSource === 'now' ? `${LABELS.now} · ${fmtClockUtc(now)}` : LABELS.scenario}
-      </span>
       <span className="grow" />
       <label className="sr-only" htmlFor="sat-cat">Screening set</label>
       <select

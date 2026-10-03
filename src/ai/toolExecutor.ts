@@ -15,6 +15,7 @@ import { DEMO_THRESHOLDS, describeThresholds } from '../simulation/weather';
 import { reduceWithResult, type Action, type InvestigationState } from '../state/reducer';
 import { TOOL_INPUT_SCHEMAS, type ToolName } from './toolSchemas';
 import { SAT_TOOL_NAMES, planSatelliteTool, type SatToolName, type ToolContext } from './satelliteTools';
+import { compass, computeViewingPlan } from '../satellites/viewing';
 
 export type { ToolContext };
 
@@ -357,6 +358,38 @@ export function executeTool(state: InvestigationState, name: string, rawInput: u
           ],
           provenance: provenance(state),
           limitations: [LIMITS.site, LIMITS.notSteering],
+        },
+      };
+    }
+    case 'show_best_viewing': {
+      const actions: Action[] = [{ type: 'SET_VIEWING', on: true }];
+      const r = applyAll(state, actions);
+      if (!r.ok) return fail(name, state, r.error);
+      const plan = computeViewingPlan(state.experiment, state.mission);
+      const b = plan.best;
+      if (!b) return fail(name, state, 'No land within 150 km of this launch site has a clear view of the illustrative ascent.');
+      return {
+        ok: true,
+        name,
+        receipt: `Showing the best viewing spot: ${b.distanceKm} km ${compass(b.bearingFromSiteDeg)} of the pad.`,
+        actions,
+        state: r.state,
+        result: {
+          tool,
+          ok: true,
+          spot: { distanceKm: b.distanceKm, direction: compass(b.bearingFromSiteDeg), latDeg: Math.round(b.latDeg * 100) / 100, lonDeg: Math.round(b.lonDeg * 100) / 100 },
+          look: { towards: compass(b.lookAzDeg), peakElevationDeg: Math.round(b.peakElevDeg), visibleMinutes: Math.round((b.visibleSec / 60) * 10) / 10 },
+          weather: { quality: plan.weather.quality, cloudPct: plan.weather.cloudPct, precipPct: plan.weather.precipPct, forecastUtc: plan.weather.forecastUtc },
+          clearestSuppliedWindow: plan.clearestWindow,
+          facts: [
+            'Spot chosen for a side-on view of the climb, a comfortable peak elevation (20–45° ideal), long visibility above 5°, and closeness.',
+            'Only land within 15–150 km of the pad is considered (coarse coastline).',
+          ],
+          provenance: { geometry: 'computed (illustrative ascent)', weather: plan.weather.quality === 'unknown' ? 'no demo forecast for this site' : 'demo fixture at the pad' },
+          limitations: [
+            'Viewing geometry only: sunlight/darkness, terrain, access, and safety zones are not modelled.',
+            'Weather is the demo forecast at the pad applied to the whole region.',
+          ],
         },
       };
     }

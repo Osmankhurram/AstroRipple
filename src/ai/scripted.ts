@@ -108,6 +108,7 @@ export function planScripted(question: string, state: InvestigationState): Plann
     const scenarioId = /\b(baseline|original|window a)\b/.test(s) || state.revision === 0 ? 'baseline' : 'experiment';
     return [{ name: 'explain_weather', input: { scenarioId } }];
   }
+  if (/(where.*(watch|view|see)|best view|viewing|spectat|watch (it|the launch) from)/.test(s)) return [{ name: 'show_best_viewing', input: {} }];
   if (/(site[- ]to[- ]plane|angle|plane|alignment)/.test(s)) return [{ name: 'focus_scene', input: { target: 'orbital-plane' } }];
   if (/(launch site|where.*launch|pad)/.test(s)) return [{ name: 'focus_scene', input: { target: 'launch-site' } }];
   if (/(overview|zoom out|whole earth)/.test(s)) return [{ name: 'focus_scene', input: { target: 'overview' } }];
@@ -145,6 +146,12 @@ export function templateExplanation(outcome: ToolOutcome): string {
     case 'set_launch_site': {
       const a = r.after!, b = r.before!;
       return `Changed: launch site ${b.launchSite} → ${a.launchSite}. Observed: site-to-plane angle ${b.siteToPlaneAngleDeg.toFixed(1)}° → ${a.siteToPlaneAngleDeg.toFixed(1)}° against the same frozen plane; weather ${a.weatherStatus}.${lim}`;
+    }
+    case 'show_best_viewing': {
+      const x = r as unknown as { spot: { distanceKm: number; direction: string }; look: { towards: string; peakElevationDeg: number; visibleMinutes: number }; weather: { quality: string; cloudPct: number | null }; clearestSuppliedWindow: { id: string; quality: string } | null };
+      const wx = x.weather.quality === 'unknown' ? 'no forecast here' : `${x.weather.quality} (${x.weather.cloudPct}% cloud)`;
+      const win = x.clearestSuppliedWindow ? ` Clearest window: ${x.clearestSuppliedWindow.id}.` : '';
+      return `Best view: ${x.spot.distanceKm} km ${x.spot.direction} of the pad, looking ${x.look.towards}. The rocket climbs to ${x.look.peakElevationDeg}° and stays visible about ${Math.round(x.look.visibleMinutes)} min; viewing weather is ${wx}.${win}${lim}`;
     }
     default:
       return satelliteTemplate(r);

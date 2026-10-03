@@ -48,6 +48,8 @@ import { cameraBus, liveClock, useInvestigation } from '@/state/store';
 import { planeMatrix, simToThree } from '@/render/frameAdapter';
 import { fallbackEarthTexture, loadEarthTexture } from '@/render/earthTexture';
 import { SatelliteLayer, type FocusBus } from './satellite/SatelliteLayer';
+import { ViewingLayer, spotEcf } from './ViewingLayer';
+import { computeViewingPlan } from '@/satellites/viewing';
 import { paneInstantMs } from './satellite/paneTime';
 
 import { COLORS } from './sceneColors';
@@ -100,7 +102,7 @@ function sitePositionFixed(lat: number, lon: number, r = 1): THREE.Vector3 {
 }
 
 /** Camera goal for a focus target, computed from canonical geometry of the given scenario. */
-function cameraGoal(st: InvestigationState, focus: FocusTarget, bus?: FocusBus | null): { pos: THREE.Vector3; target: THREE.Vector3 } {
+function cameraGoal(st: InvestigationState, focus: FocusTarget, bus?: FocusBus | null, pane?: ScenarioId): { pos: THREE.Vector3; target: THREE.Vector3 } {
   const tracked = focus === 'satellite' ? bus?.selected : focus === 'encounter' ? bus?.rocket : null;
   if (tracked) {
     const up = tracked.clone().normalize();
@@ -109,6 +111,29 @@ function cameraGoal(st: InvestigationState, focus: FocusTarget, bus?: FocusBus |
     const dist = focus === 'satellite' ? 0.9 : 0.14;
     const off = up.multiplyScalar(dist * 0.85).add(side.multiplyScalar(dist * 0.5));
     return { pos: tracked.clone().add(off), target: tracked.clone() };
+  }
+  if (focus === 'viewing') {
+    // Spectator view: just above the suggested spot, looking along the line of sight at the climb.
+    const which: ScenarioId = pane ?? (st.view.mode === 'single' ? st.view.shown : 'experiment');
+    const sc = which === 'baseline' ? st.baseline : st.experiment;
+    const plan = computeViewingPlan(sc, st.mission);
+    const s = spotEcf(plan);
+    if (s && plan.best) {
+      const th = targetValues(st, which, liveClock.playbackSec).theta;
+      const world = (v: readonly [number, number, number]) => simToThree(rotateZ([v[0] / 6371, v[1] / 6371, v[2] / 6371], th));
+      const step = 5;
+      const mid = plan.path[Math.min(plan.path.length - 1, Math.round((plan.best.visibleFrom + Math.min(plan.best.visibleTo, 240)) / 2 / step))];
+      const spot = world(s);
+      const up = spot.clone().normalize();
+      const look = world(mid).sub(spot);
+      // Elevated "drone" view behind the spot, looking down across it towards the climb, so the
+      // ground, the spot, the line of sight, and the visible stretch of the ascent are all in frame.
+      const horiz = look.sub(up.clone().multiplyScalar(look.dot(up))).normalize();
+      const target = spot.clone().lerp(world(mid), 0.55);
+      const pos = spot.clone().add(up.clone().multiplyScalar(0.07)).sub(horiz.multiplyScalar(0.09));
+      return { pos, target };
+    }
+    focus = 'overview';
   }
   if (focus === 'satellite' || focus === 'encounter') focus = 'overview';
   const d = targetValues(st, 'experiment', liveClock.playbackSec);
@@ -284,6 +309,8 @@ interface SceneProps {
 function SceneContents({ which, canvasId, showGhost, containerRef, overlayRef }: SceneProps) {
   const st = useInvestigation();
   const satMode = st.satellite.enabled;
+  // Satellite Mode and the close-up "Best view" camera both isolate the illustrative inertial plane.
+  const planeHidden = satMode || st.view.viewing;
   const focusBus = useRef<FocusBus>({ selected: null, rocket: null });
   // Mounted on first use and then kept (its Html labels must not be unmounted mid-render).
   const satEver = useRef(false);
@@ -354,7 +381,7 @@ function SceneContents({ which, canvasId, showGhost, containerRef, overlayRef }:
       marker.current.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), pos.clone().normalize());
       const ms = 1 + (p.target === 'site' ? pulseAmt * 0.9 : 0);
       // Satellite close-ups zoom to ~1,000 km: keep the site marker from swamping the view (not to scale anyway).
-      const near = s.satellite.enabled ? Math.min(1, camera.position.distanceTo(marker.current.getWorldPosition(new THREE.Vector3())) / 2.2) : 1;
+      const near = s.satellite.enabled || s.view.viewing ? Math.min(1, camera.position.distanceTo(marker.current.getWorldPosition(new THREE.Vector3())) / 2.2) : 1;
       marker.current.scale.setScalar(ms * near);
     }
 
@@ -382,7 +409,7 @@ function SceneContents({ which, canvasId, showGhost, containerRef, overlayRef }:
       arcBuf[i * 3 + 1] = q.y;
       arcBuf[i * 3 + 2] = q.z;
     }
-    const visible = angle > 0.05 && !s.satellite.enabled;
+    const visible = angle > 0.05 && !s.satellite.enabled && !s.view.viewing;
     if (arcRef.current) {
       arcRef.current.geometry.setPositions(arcBuf);
       arcRef.current.visible = visible;
@@ -403,7 +430,7 @@ function SceneContents({ which, canvasId, showGhost, containerRef, overlayRef }:
       // Label sits just outside the arc's midpoint; text comes from the displayed geometry.
       q.copy(rT).lerp(pT, 0.5).normalize().multiplyScalar(ANNOT_R + 0.12).project(camera);
       const onScreen = q.z < 1 && Math.abs(q.x) < 1.1 && Math.abs(q.y) < 1.1;
-      ov.style.display = onScreen && !s.satellite.enabled ? 'block' : 'none';
+      ov.style.display = onScreen && !s.satellite.enabled && !s.view.viewing ? 'block' : 'none';
       ov.style.transform = `translate(${((q.x * 0.5 + 0.5) * size.width).toFixed(1)}px, ${((-q.y * 0.5 + 0.5) * size.height).toFixed(1)}px) translate(-50%, -50%)`;
       ov.textContent = visible ? `∠ ${angle.toFixed(1)}°` : '∠ 0.0° · in plane';
       ov.classList.toggle('pulse-label', p.target === 'angle' && pulseAmt > 0.05);
@@ -430,7 +457,7 @@ function SceneContents({ which, canvasId, showGhost, containerRef, overlayRef }:
       )}
       {st.view.showAxis && <Line points={[[0, -1.45, 0], [0, 1.45, 0]]} color={COLORS.axis} lineWidth={1.2} dashed dashSize={0.05} gapSize={0.04} transparent opacity={0.55} />}
 
-      <group ref={planeGroup} visible={!satMode}>
+      <group ref={planeGroup} visible={!planeHidden}>
         <OrbitPlane color={color} radius={radius} highlightRef={planeHighlight} />
         <mesh ref={sat}>
           <sphereGeometry args={[0.032, 16, 12]} />
@@ -445,12 +472,12 @@ function SceneContents({ which, canvasId, showGhost, containerRef, overlayRef }:
 
       {/* Always mounted (toggling Html labels by mount/unmount is fragile); visibility toggled instead. */}
       {(
-        <group ref={ghost} visible={showGhost && !satMode}>
+        <group ref={ghost} visible={showGhost && !planeHidden}>
           <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, 0.003, 0]}>
             <ringGeometry args={[0.03, 0.042, 32]} />
             <meshBasicMaterial color={COLORS.baseline} side={THREE.DoubleSide} transparent opacity={0.9} />
           </mesh>
-          <Html position={[0, -0.09, 0]} center zIndexRange={[20, 0]} style={{ pointerEvents: 'none', display: showGhost && !satMode ? undefined : 'none' }}>
+          <Html position={[0, -0.09, 0]} center zIndexRange={[20, 0]} style={{ pointerEvents: 'none', display: showGhost && !planeHidden ? undefined : 'none' }}>
             <div className="scene-label ghost-label">Baseline site</div>
           </Html>
         </group>
@@ -460,6 +487,7 @@ function SceneContents({ which, canvasId, showGhost, containerRef, overlayRef }:
       <group ref={earthGroup}>
         <Earth />
         {satEver.current && <SatelliteLayer which={which} focusBus={focusBus} paneColor={color} enabled={satMode} />}
+        <ViewingLayer which={which} paneColor={color} />
         <SiteMarker color={color} markerRef={marker}>
           {which === 'experiment' && (
             <SiteRipple trigger={st.revision} color={sameScenario(st.experiment, st.baseline) ? COLORS.baseline : COLORS.experiment} reduced={st.view.reducedMotion} />
@@ -506,7 +534,7 @@ function CameraRig({ canvasId, containerRef, focusBus }: { canvasId: string; con
 
   const goTo = (focus: FocusTarget, instant: boolean) => {
     if (!controls.current) return;
-    const g = cameraGoal(stRef.current, focus, focusBus.current);
+    const g = cameraGoal(stRef.current, focus, focusBus.current, canvasId as ScenarioId);
     lastTracked.current = null;
     if (instant) {
       camera.position.copy(g.pos);
@@ -587,7 +615,8 @@ function CameraRig({ canvasId, containerRef, focusBus }: { canvasId: string; con
           ? 'encounter'
           : null
       : null;
-    c.minDistance = followMode ? 0.02 : 1.6;
+    const closeMode = !!followMode || (sv.view.focus === 'viewing' && sv.view.viewing);
+    c.minDistance = closeMode ? 0.01 : 1.6;
     const f = fly.current;
     if (f && followMode) {
       // Re-aim the fly-to at the moving point.
@@ -601,13 +630,13 @@ function CameraRig({ canvasId, containerRef, focusBus }: { canvasId: string; con
       // Arc around the globe rather than cutting through it.
       const p = f.fromP.clone().lerp(f.toP, e);
       const rad = THREE.MathUtils.lerp(f.fromP.length(), f.toP.length(), e);
-      p.setLength(Math.max(rad, followMode ? 1.0 : 1.5));
+      p.setLength(Math.max(rad, closeMode ? 1.0 : 1.5));
       camera.position.copy(p);
       c.target.copy(f.fromT.clone().lerp(f.toT, e));
       c.update();
       if (k >= 1) {
         fly.current = null;
-        if (!followMode) publish(); // so canvases mounted later start from the same pose
+        if (!closeMode) publish(); // so canvases mounted later start from the same pose
       }
       return;
     }
@@ -625,6 +654,7 @@ function CameraRig({ canvasId, containerRef, focusBus }: { canvasId: string; con
       return; // panes follow their own object; camera sync is suspended while following
     }
     lastTracked.current = null;
+    if (closeMode) return; // spectator view is per pane (each Earth is rotated to its own instant)
     const s = stRef.current;
     if (s.view.syncCameras && cameraBus.version !== seen.current && cameraBus.source !== canvasId && performance.now() > userActive.current) {
       seen.current = cameraBus.version;
@@ -652,7 +682,7 @@ function CameraRig({ canvasId, containerRef, focusBus }: { canvasId: string; con
       }}
       onChange={() => {
         const v = stRef.current.view;
-        const following = stRef.current.satellite.enabled && (v.focus === 'satellite' || v.focus === 'encounter');
+        const following = (stRef.current.satellite.enabled && (v.focus === 'satellite' || v.focus === 'encounter')) || (v.focus === 'viewing' && v.viewing);
         if (performance.now() < userActive.current && v.syncCameras && !following) publish();
       }}
     />
@@ -678,7 +708,7 @@ export function GlobeCanvas({ which, showGhost, label, active = true }: { which:
         gl={{ antialias: true, powerPreference: 'high-performance' }}
         raycaster={{ params: { Points: { threshold: 0.015 } } as never }}
       >
-        <color attach="background" args={['#070b14']} />
+        <color attach="background" args={['#04070c']} />
         <SceneContents which={which} canvasId={canvasId} showGhost={showGhost} containerRef={containerRef} overlayRef={overlayRef} />
       </Canvas>
       <div ref={overlayRef} className="scene-label angle-label angle-overlay" aria-hidden="true" />

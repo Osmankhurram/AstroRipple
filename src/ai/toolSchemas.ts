@@ -29,6 +29,8 @@ export const ResetExperimentInput = z.object({}).strict();
 
 export const SetLaunchSiteInput = z.object({ siteId: z.enum(LAUNCH_SITE_IDS as unknown as [string, ...string[]]) }).strict();
 
+export const ShowBestViewingInput = z.object({}).strict();
+
 export const TOOL_INPUT_SCHEMAS = {
   set_launch_offset: SetLaunchOffsetInput,
   set_orbit_preset: SetOrbitPresetInput,
@@ -37,6 +39,7 @@ export const TOOL_INPUT_SCHEMAS = {
   focus_scene: FocusSceneInput,
   reset_experiment: ResetExperimentInput,
   set_launch_site: SetLaunchSiteInput,
+  show_best_viewing: ShowBestViewingInput,
   ...SAT_TOOL_INPUT_SCHEMAS,
 } as const;
 
@@ -120,6 +123,12 @@ export const TOOL_DEFINITIONS = [
       required: ['siteId'],
       additionalProperties: false,
     },
+  },
+  {
+    name: 'show_best_viewing',
+    description:
+      'Show the best place to watch the EXPERIMENT launch: a spot on land within 150 km of the pad with the most side-on, comfortable view of the illustrative ascent, which way to look, and a viewing rating from the demo weather (cloud, rain) at that launch time. Flies the camera to a spectator view.',
+    input_schema: { type: 'object', properties: {}, additionalProperties: false },
   },
   ...SAT_TOOL_DEFINITIONS,
 ] as const;
