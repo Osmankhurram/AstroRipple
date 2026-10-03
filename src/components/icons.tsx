@@ -84,3 +84,17 @@ export const IconSend = (p: P) => (
   </S>
 );
 export const IconRestart = IconReset;
+export const IconEye = (p: P) => (
+  <S {...p}>
+    <path d="M1.5 8s2.4-4.5 6.5-4.5S14.5 8 14.5 8s-2.4 4.5-6.5 4.5S1.5 8 1.5 8z" />
+    <circle cx="8" cy="8" r="1.9" />
+  </S>
+);
+export const IconLegend = (p: P) => (
+  <S {...p}>
+    <path d="M6 4.5h7.5M6 8h7.5M6 11.5h7.5" />
+    <circle cx="3" cy="4.5" r=".8" fill="currentColor" />
+    <circle cx="3" cy="8" r=".8" fill="currentColor" />
+    <circle cx="3" cy="11.5" r=".8" fill="currentColor" />
+  </S>
+);

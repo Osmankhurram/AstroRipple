@@ -1,25 +1,20 @@
 'use client';
-/** "Launch proximity screening — educational": run controls, comparison, events, replay, chart, metadata. */
+/**
+ * "Launch proximity screening — educational".
+ * One question, one action, two verdict cards, one watch button. Explanations live in a single ⓘ;
+ * everything visible is a short phrase.
+ */
 import { useMemo, useState } from 'react';
-import { ASCENT_FEASIBILITY_NOTE, TRAJECTORIES } from '@/satellites/ascent';
+import { TRAJECTORIES } from '@/satellites/ascent';
 import { CATALOGS } from '@/satellites/catalogs';
 import { screeningLaunchEpochMs } from '@/satellites/scenarioTime';
-import {
-  RESULT_DISCLAIMER,
-  SCREENING_LIMITS,
-  compareScenarios,
-  fmtKm,
-  resultHeadline,
-  type CloseApproachEvent,
-  type ScenarioScreening,
-} from '@/satellites/screening';
-import { fmtClockUtc, fmtDateTimeUtc } from '@/satellites/time';
+import { RESULT_DISCLAIMER, SCREENING_LIMITS, compareScenarios, fmtKm, type CloseApproachEvent, type ScenarioScreening } from '@/satellites/screening';
+import { fmtClockUtc } from '@/satellites/time';
 import { fmtOffset, offsetMinutes } from '@/simulation/scenario';
-import { PLAYBACK_SPEEDS, screeningUnavailableReason } from '@/state/reducer';
+import { screeningUnavailableReason } from '@/state/reducer';
 import { findObject, satRuntime, useSatRuntime } from '@/state/satRuntime';
 import { runIsCurrent } from '@/state/screeningRuns';
 import { store, useInvestigation } from '@/state/store';
-import { IconPause, IconPlay } from '../icons';
 import { COLORS } from '../sceneColors';
 import { InfoTip } from '../ui';
 import { DistanceChart, EncounterInset } from './EncounterCharts';
@@ -28,32 +23,47 @@ import { LABELS, SAT_COLORS } from './satUi';
 import { satAct } from './SatelliteControls';
 import { SyntheticTourButton } from './SyntheticTour';
 
-function ScenarioColumn({ r, which, offsetLabel }: { r: ScenarioScreening; which: 'baseline' | 'experiment'; offsetLabel: string }) {
-  const c = which === 'baseline' ? COLORS.baseline : COLORS.experiment;
+/** Bring the globe back into view after an action that animates it (results sit below the globe). */
+export function revealGlobe() {
+  const el = document.getElementById('orbital-view');
+  if (!el) return;
+  const r = el.getBoundingClientRect();
+  if (r.top < -r.height * 0.4 || r.top > window.innerHeight * 0.5) el.scrollIntoView({ block: 'start', behavior: store.get().view.reducedMotion ? 'auto' : 'smooth' });
+}
+
+const idOf = (m: { noradId: number | null; syntheticId: string | null }) => (m.noradId ? `NORAD ${m.noradId}` : m.syntheticId ?? '');
+
+/** Focus an approach: the globe flies there and pauses 15 s before it. `play` then replays it at 1×. */
+function focusApproach(scenarioId: 'baseline' | 'experiment', key: string, elapsedSec: number, play: boolean) {
+  revealGlobe();
+  satAct({ type: 'SAT_FOCUS_EVENT', scenarioId, key, elapsedSec });
+  if (play) {
+    satAct({ type: 'SET_PLAYBACK_SPEED', speed: 1 });
+    satAct({ type: 'SET_PLAYING', playing: true });
+  }
+}
+
+function VerdictCard({ r, which, when, newClosest }: { r: ScenarioScreening; which: 'baseline' | 'experiment'; when: string; newClosest: boolean }) {
+  const hits = new Set(r.events.map((e) => e.key)).size;
+  const m = r.minimum;
   return (
-    <div className="prox-col" style={{ ['--scen' as string]: c } as React.CSSProperties}>
+    <div className={`prox-col ${hits ? 'hit' : ''}`} style={{ ['--scen' as string]: which === 'baseline' ? COLORS.baseline : COLORS.experiment } as React.CSSProperties}>
       <div className="prox-col-head">
         <span className="letter">{which === 'baseline' ? 'B' : 'E'}</span>
-        {which === 'baseline' ? 'Baseline' : 'Experiment'} <span className="muted">{offsetLabel}</span>
+        {which === 'baseline' ? 'Baseline' : 'Experiment'}
+        <span className="muted mono">{when}</span>
       </div>
-      <p className={`prox-headline ${r.events.length ? 'hit' : ''}`}>
-        {r.events.length ? '◆ ' : ''}
-        {resultHeadline(r)}
+      <p className={`prox-verdict ${hits ? 'hit' : 'clear'}`}>
+        {hits ? `◆ ${hits} ${LABELS.approach.toLowerCase()}${hits > 1 ? 'es' : ''}` : '✓ No approaches found'}
       </p>
-      {r.minimum && (
-        <dl className="kv">
-          <dt>Closest object</dt>
-          <dd>
-            {r.minimum.name} <span className="mono muted">{r.minimum.noradId ? `NORAD ${r.minimum.noradId}` : r.minimum.syntheticId}</span>
-          </dd>
-          <dt>Min. estimated separation</dt>
-          <dd className="mono">
-            {fmtKm(r.minimum.separationKm)} at T+{Math.round(r.minimum.elapsedSec)} s ({fmtClockUtc(Date.parse(r.minimum.utc))})
-          </dd>
-        </dl>
+      <div className="prox-big mono">{m ? fmtKm(m.separationKm) : '—'}</div>
+      {m && (
+        <p className="prox-closest">
+          closest · <strong>{m.name}</strong> · T+{Math.round(m.elapsedSec)} s{newClosest && <span className="tag">new</span>}
+        </p>
       )}
-      <span className="fine">
-        Launch {fmtDateTimeUtc(Date.parse(r.launchEpochUtc))} · {r.counts.screened} of {r.counts.loaded} screened
+      <span className="fine mono" title="Selected distance · screened objects · time interval">
+        ≤ {r.thresholdKm} km · {r.counts.screened} objects · T+{r.intervalSec[0]}–{r.intervalSec[1]} s
       </span>
     </div>
   );
@@ -62,7 +72,7 @@ function ScenarioColumn({ r, which, offsetLabel }: { r: ScenarioScreening; which
 function EventRow({ e, active }: { e: CloseApproachEvent; active: boolean }) {
   return (
     <li>
-      <button type="button" className={`prox-event ${active ? 'on' : ''}`} onClick={() => satAct({ type: 'SAT_FOCUS_EVENT', scenarioId: e.scenarioId, key: e.key, elapsedSec: e.elapsedSec })} title="Animate to this approach and pause just before it">
+      <button type="button" className={`prox-event ${active ? 'on' : ''}`} onClick={() => focusApproach(e.scenarioId, e.key, e.elapsedSec, false)} title="Show on the globe">
         <span className="ev-mark" style={{ color: SAT_COLORS.approach }}>◆</span>
         <span className="ev-name">{e.name}</span>
         <span className="mono">{fmtKm(e.separationKm)}</span>
@@ -77,10 +87,28 @@ function RunMeta({ r }: { r: ScenarioScreening }) {
   const c = r.counts;
   return (
     <div className="prox-meta">
-      <strong>{r.scenarioId === 'baseline' ? 'Baseline' : 'Experiment'}</strong> — status {r.status}; objects loaded {c.loaded}, screened {c.screened} ({c.sampled} sampled
-      {c.radialBoundCleared ? `, ${c.radialBoundCleared} cleared by radial bound` : ''}), age-excluded {c.staleRejected}, stale-flagged {c.staleWarned}, failed {c.propagationFailed}. Interval T+{r.intervalSec[0]}–{r.intervalSec[1]} s;
-      coarse step {r.coarseStepSec} s; refinement {r.refineTolSec} s; threshold {r.thresholdKm} km; trajectory {r.trajectoryId} ({r.trajectoryProvenance}); scenario revision {r.scenarioRevision}.
-      {r.failures.length > 0 && <> Failures: {r.failures.slice(0, 5).map((f) => `${f.name} (${f.reason})`).join('; ')}.</>}
+      <strong>{r.scenarioId === 'baseline' ? 'Baseline' : 'Experiment'}</strong>
+      <dl className="kv">
+        <dt>Status</dt>
+        <dd>{r.status}</dd>
+        <dt>Screened</dt>
+        <dd>
+          {c.screened} of {c.loaded}
+          {c.radialBoundCleared ? ` (${c.radialBoundCleared} by radial bound)` : ''}
+        </dd>
+        <dt>Excluded</dt>
+        <dd>
+          {c.staleRejected} old elements · {c.propagationFailed} failed{c.staleWarned ? ` · ${c.staleWarned} stale-flagged` : ''}
+        </dd>
+        <dt>Sampling</dt>
+        <dd>
+          every {r.coarseStepSec} s, refined to {r.refineTolSec} s
+        </dd>
+        <dt>Trajectory</dt>
+        <dd>
+          {r.trajectoryId} ({r.trajectoryProvenance})
+        </dd>
+      </dl>
       <ul>
         {r.limitations.map((l) => (
           <li key={l}>{l}</li>
@@ -114,20 +142,13 @@ export function ProximityPanel() {
   const epochs = { baseline: screeningLaunchEpochMs(sat.catalogId, st.baseline, st.baseline), experiment: screeningLaunchEpochMs(sat.catalogId, st.experiment, st.baseline) };
   const events = useMemo(() => [...(e?.events ?? []).slice(0, 6), ...(b?.events ?? []).slice(0, 6)], [b, e]);
   const focusEvent = sat.focus;
+  const done = !!b && !!e && run.phase === 'complete';
 
-  const jumpClosest = () => {
+  const watchClosest = () => {
     const pick = e?.events[0] ?? b?.events[0];
-    if (pick) return satAct({ type: 'SAT_FOCUS_EVENT', scenarioId: pick.scenarioId, key: pick.key, elapsedSec: pick.elapsedSec });
+    if (pick) return focusApproach(pick.scenarioId, pick.key, pick.elapsedSec, true);
     const m = e?.minimum ?? b?.minimum;
-    if (m) satAct({ type: 'SAT_FOCUS_EVENT', scenarioId: e?.minimum ? 'experiment' : 'baseline', key: m.key, elapsedSec: m.elapsedSec });
-  };
-  const replaySlow = () => {
-    if (!sat.focus) jumpClosest();
-    const s = store.get();
-    if (!s.satellite.focus) return;
-    satAct({ type: 'SET_PLAYBACK', seconds: Math.max(0, s.satellite.focus.elapsedSec - 15) });
-    satAct({ type: 'SET_PLAYBACK_SPEED', speed: 1 });
-    satAct({ type: 'SET_PLAYING', playing: true });
+    if (m) focusApproach(e?.minimum ? 'experiment' : 'baseline', m.key, m.elapsedSec, true);
   };
 
   const commitThreshold = () => {
@@ -137,95 +158,113 @@ export function ProximityPanel() {
     if (Number.isFinite(v)) satAct({ type: 'SAT_SET_THRESHOLD', km: v });
   };
 
+  const pct = run.progress.total ? Math.round((100 * run.progress.done) / run.progress.total) : 0;
+  const status =
+    run.phase === 'running' ? { t: `Analyzing ${pct}%`, c: 'run' } :
+    stale ? { t: 'Out of date', c: 'warn' } :
+    run.phase === 'complete' ? { t: 'Done', c: 'ok' } :
+    run.phase === 'cancelled' ? { t: 'Cancelled', c: 'warn' } :
+    run.phase === 'failed' ? { t: 'Failed', c: 'warn' } :
+    { t: 'Ready', c: '' };
+
+  const f = cmp?.focus;
+  const arrow = f?.change === 'closer' ? '↓ closer' : f?.change === 'farther' ? '↑ farther' : f?.change === 'similar' ? '≈ similar' : '';
+
   return (
     <section className="card prox" aria-labelledby="prox-h" id="proximity">
       <header className="prox-head">
         <div>
           <h2 id="prox-h">{LABELS.screening}</h2>
-          <p className="fine">
-            {ASCENT_FEASIBILITY_NOTE}{' '}
-            <InfoTip label="About the illustrative ascent">
-              {traj?.note} Delay model: the delayed launch repeats the same Earth-fixed path at a later epoch. It does not re-solve or maintain the fixed target plane shown outside Satellite Mode, and does not show the delayed mission is achievable.
-            </InfoTip>
-          </p>
+          <p className="prox-sub">Does the climbing rocket pass near any satellite?</p>
         </div>
-        <div className="prox-actions">
-          <label className="inline-num" title="Illustrative flagging distance — not a collision radius or a regulatory standard">
-            Distance
-            <input
-              type="number"
-              className="field"
-              min={SCREENING_LIMITS.minThresholdKm}
-              max={SCREENING_LIMITS.maxThresholdKm}
-              step={5}
-              value={thrDraft ?? sat.thresholdKm}
-              onChange={(ev) => setThrDraft(ev.target.value)}
-              onBlur={commitThreshold}
-              onKeyDown={(ev) => ev.key === 'Enter' && commitThreshold()}
-              aria-label="Demonstration screening distance in kilometres"
-            />
-            km
-          </label>
-          {run.phase === 'running' ? (
+        <InfoTip label="How launch proximity screening works">
+          <strong>How it works</strong>
+          <ul>
+            <li>Rocket vs every object in the set, at the same instants, T+0–9 min.</li>
+            <li>Runs for both launch times: baseline and experiment.</li>
+            <li>A delay re-flies the same illustrative path later; the satellites have moved on.</li>
+            <li>Distance = a flagging threshold, not a collision radius.</li>
+            <li>{RESULT_DISCLAIMER}</li>
+          </ul>
+        </InfoTip>
+      </header>
+
+      <div className="prox-run">
+        <label className="inline-num" title="Flag anything closer than this (illustrative, not a collision radius)">
+          Within
+          <input
+            type="number"
+            className="field"
+            min={SCREENING_LIMITS.minThresholdKm}
+            max={SCREENING_LIMITS.maxThresholdKm}
+            step={5}
+            value={thrDraft ?? sat.thresholdKm}
+            onChange={(ev) => setThrDraft(ev.target.value)}
+            onBlur={commitThreshold}
+            onKeyDown={(ev) => ev.key === 'Enter' && commitThreshold()}
+            aria-label="Screening distance in kilometres"
+          />
+          km
+        </label>
+        {run.phase === 'running' ? (
+          <>
+            <progress className="prox-bar" max={run.progress.total || 1} value={run.progress.done} aria-label="Analysis progress" />
             <button type="button" className="btn sm" onClick={() => satRuntime.cancelScreening()}>
               Cancel
             </button>
-          ) : (
-            <button
-              type="button"
-              className="btn sm primary"
-              disabled={!!unavailable || !snap || entry?.status !== 'ready'}
-              onClick={() => satAct({ type: 'SAT_REQUEST_SCREENING' })}
-              title={unavailable ?? 'Compute baseline and experiment closest approaches against the screening set'}
-            >
-              Analyze launch proximity
-            </button>
-          )}
-        </div>
-      </header>
+          </>
+        ) : (
+          <button
+            type="button"
+            className="btn sm primary"
+            disabled={!!unavailable || !snap || entry?.status !== 'ready'}
+            onClick={() => satAct({ type: 'SAT_REQUEST_SCREENING' })}
+            title={unavailable ?? 'Compare the rocket with every object, for both launch times'}
+          >
+            {done || stale ? 'Analyze again' : 'Analyze'}
+          </button>
+        )}
+        <span className="grow" />
+        <span className={`prox-status ${status.c}`} role="status" aria-live="polite">
+          <i className="led" /> {status.t}
+        </span>
+      </div>
 
-      {unavailable && <p className="prox-note warn">{unavailable}</p>}
-      {synthetic && (
-        <p className="prox-note synthetic">
-          Synthetic demonstration: fictional objects (SYN-A…D) and fixed demonstration time. Results below are computed, but the scenario was deliberately constructed.
+      {unavailable && (
+        <p className="prox-note warn" title={unavailable}>
+          Needs the Florida launch site — the only modelled ascent starts there.
         </p>
       )}
+      {synthetic && <p className="prox-note synthetic">Synthetic demo · fictional objects, built to show an encounter.</p>}
+      {run.phase === 'idle' && !unavailable && <p className="prox-hint">Checks every object against the rocket’s 9-minute climb, for both launch times.</p>}
+      {run.phase === 'cancelled' && <p className="prox-note warn">Cancelled — no result.</p>}
+      {run.phase === 'failed' && <p className="prox-note warn">Failed — no result{run.error ? ` (${run.error})` : ''}.</p>}
+      {stale && run.phase === 'complete' && <p className="prox-note warn">Setup changed — analyze again.</p>}
 
-      {run.phase === 'running' && (
-        <div className="prox-progress" role="status" aria-live="polite">
-          <span>Analyzing…</span>
-          <progress max={run.progress.total || 1} value={run.progress.done} />
-          <span className="mono muted">
-            {run.progress.done}/{run.progress.total} object-scenarios
-          </span>
-        </div>
-      )}
-      {run.phase === 'cancelled' && <p className="prox-note warn">Screening cancelled — incomplete, no conclusion. {stale ? 'The setup changed while it was running.' : ''}</p>}
-      {run.phase === 'failed' && <p className="prox-note warn">Screening failed — incomplete, no conclusion{run.error ? ` (${run.error})` : ''}.</p>}
-      {stale && run.phase === 'complete' && <p className="prox-note warn">These results describe a previous setup (time, catalog, distance, or trajectory changed). Analyze again for the current experiment.</p>}
-
-      {b && e && run.phase === 'complete' && (
+      {done && b && e && (
         <div className={`prox-body ${current ? '' : 'stale'}`}>
           <div className="prox-cols">
-            <ScenarioColumn r={b} which="baseline" offsetLabel={synthetic ? 'demo epoch' : 'scheduled time'} />
-            <ScenarioColumn r={e} which="experiment" offsetLabel={off ? fmtOffset(off) : 'same time'} />
+            <VerdictCard r={b} which="baseline" when={synthetic ? 'demo time' : fmtClockUtc(Date.parse(b.launchEpochUtc), false)} newClosest={false} />
+            <VerdictCard r={e} which="experiment" when={off ? fmtOffset(off) : 'same time'} newClosest={!!cmp && !cmp.sameClosestObject} />
           </div>
-          {cmp && (
-            <div className="prox-compare">
-              {cmp.focus && <p>{cmp.focus.sentence}</p>}
-              {!cmp.sameClosestObject && cmp.baselineMin && cmp.experimentMin && (
-                <p className="fine">
-                  Closest objects differ: baseline {cmp.baselineMin.name} ({cmp.baselineMin.noradId ? `NORAD ${cmp.baselineMin.noradId}` : cmp.baselineMin.syntheticId}), experiment {cmp.experimentMin.name} ({cmp.experimentMin.noradId ? `NORAD ${cmp.experimentMin.noradId}` : cmp.experimentMin.syntheticId}).
-                </p>
-              )}
-              <p className="fine">
-                Distinct objects within {b.thresholdKm} km: baseline {cmp.baselineCount}, experiment {cmp.experimentCount}. {cmp.coverageNotes.join(' ')}
-              </p>
+
+          {off !== 0 && f && f.baseline && f.experiment && (
+            <div className={`prox-delta ${f.change ?? ''}`} title={f.sentence}>
+              <span className="label plain">Delay effect</span>
+              <strong>{f.name}</strong>
+              <span className="mono">
+                {fmtKm(f.baseline.separationKm)} → {fmtKm(f.experiment.separationKm)}
+              </span>
+              <span className="prox-arrow">{arrow}</span>
+              {f.baselineWithin && !f.experimentWithin && <span className="tag">now outside {e.thresholdKm} km</span>}
+              {!f.baselineWithin && f.experimentWithin && <span className="tag hit">now within {e.thresholdKm} km</span>}
             </div>
           )}
+          {cmp && cmp.coverageNotes.length > 0 && <p className="prox-note warn">Coverage differs between scenarios — see details.</p>}
+
           {events.length > 0 && (
             <div>
-              <span className="label plain">{LABELS.approach}s ({LABELS.within.toLowerCase()})</span>
+              <span className="label plain">{LABELS.approach}es</span>
               <ul className="prox-events">
                 {events.map((ev) => (
                   <EventRow key={ev.id} e={ev} active={!!focusEvent && focusEvent.key === ev.key && focusEvent.scenarioId === ev.scenarioId} />
@@ -234,94 +273,79 @@ export function ProximityPanel() {
             </div>
           )}
 
-          <div className="prox-replay" role="group" aria-label="Encounter replay">
-            <button type="button" className="btn sm" onClick={jumpClosest}>
-              Jump to closest approach
-            </button>
-            <button type="button" className="btn sm" onClick={replaySlow} disabled={!e.minimum && !b.minimum}>
-              Replay slowly
-            </button>
-            <button type="button" className={`btn sm icon ${st.view.playing ? 'on' : ''}`} aria-label={st.view.playing ? 'Pause' : 'Play'} aria-pressed={st.view.playing} onClick={() => satAct({ type: 'SET_PLAYING', playing: !st.view.playing })}>
-              {st.view.playing ? <IconPause /> : <IconPlay />}
-            </button>
-            <select className="field sm" aria-label="Playback speed" value={st.view.playbackSpeed} onChange={(ev) => satAct({ type: 'SET_PLAYBACK_SPEED', speed: Number(ev.target.value) })}>
-              {PLAYBACK_SPEEDS.map((s) => (
-                <option key={s} value={s}>
-                  {s}×
-                </option>
-              ))}
-            </select>
-            <input
-              type="range"
-              min={traj?.validitySeconds[0] ?? 0}
-              max={traj?.validitySeconds[1] ?? 540}
-              step={1}
-              value={Math.min(st.view.playbackOffsetSec, traj?.validitySeconds[1] ?? 540)}
-              aria-label="Time since launch"
-              aria-valuetext={`T plus ${Math.round(st.view.playbackOffsetSec)} seconds`}
-              onChange={(ev) => {
-                satAct({ type: 'SET_PLAYING', playing: false });
-                satAct({ type: 'SAT_SET_TIME_SOURCE', mode: 'scenario' });
-                satAct({ type: 'SET_PLAYBACK', seconds: Number(ev.target.value) });
-              }}
-            />
-            <span className="mono muted">T+{Math.round(st.view.playbackOffsetSec)} s</span>
-            <button type="button" className="btn sm ghost" onClick={() => satAct({ type: 'SAT_SET_TIME_SOURCE', mode: 'now' })}>
-              Return to now
-            </button>
-          </div>
-          <div className="seg sm" role="radiogroup" aria-label="Comparison timing">
-            <button type="button" role="radio" aria-checked={sat.syncMode === 'elapsed'} onClick={() => satAct({ type: 'SAT_SET_SYNC', mode: 'elapsed' })}>
-              {LABELS.synced}
-            </button>
-            <button type="button" role="radio" aria-checked={sat.syncMode === 'each-closest'} onClick={() => satAct({ type: 'SAT_SET_SYNC', mode: 'each-closest' })}>
-              {LABELS.eachClosest}
+          <div className="prox-player">
+            <button type="button" className="btn sm primary" onClick={watchClosest} disabled={!e.minimum && !b.minimum}>
+              ▶ Watch closest
             </button>
           </div>
 
           {chartObj && traj && snap && (
-            <div className="prox-viz">
-              <DistanceChart
-                snap={snap}
-                obj={chartObj}
-                traj={traj}
-                epochs={epochs}
-                thresholdKm={b.thresholdKm}
-                playheadSec={st.view.playbackOffsetSec}
-                marks={[
-                  ...(b.perObject[chartObj.key] ? [{ scenario: 'baseline' as const, t: b.perObject[chartObj.key].elapsedSec, km: b.perObject[chartObj.key].separationKm }] : []),
-                  ...(e.perObject[chartObj.key] ? [{ scenario: 'experiment' as const, t: e.perObject[chartObj.key].elapsedSec, km: e.perObject[chartObj.key].separationKm }] : []),
-                ]}
-              />
-              {focusEvent && focusEvent.key === chartObj.key && (
-                <EncounterInset
+            <div className="prox-viz-wrap">
+              <div className="prox-viz-head">
+                <span className="label plain">Distance over time · {chartObj.name}</span>
+                <span className="grow" />
+                <div className="seg sm" role="radiogroup" aria-label="Comparison timing">
+                  <button type="button" role="radio" aria-checked={sat.syncMode === 'elapsed'} title={LABELS.synced} onClick={() => satAct({ type: 'SAT_SET_SYNC', mode: 'elapsed' })}>
+                    Same T+
+                  </button>
+                  <button type="button" role="radio" aria-checked={sat.syncMode === 'each-closest'} title={LABELS.eachClosest} onClick={() => satAct({ type: 'SAT_SET_SYNC', mode: 'each-closest' })}>
+                    Each closest
+                  </button>
+                </div>
+              </div>
+              <div className="prox-viz">
+                <DistanceChart
                   snap={snap}
                   obj={chartObj}
                   traj={traj}
-                  epochMs={focusEvent.scenarioId === 'baseline' ? epochs.baseline : epochs.experiment}
-                  tauSec={focusEvent.elapsedSec}
-                  thresholdKm={sat.thresholdKm}
-                  color={focusEvent.scenarioId === 'baseline' ? COLORS.baseline : COLORS.experiment}
+                  epochs={epochs}
+                  thresholdKm={b.thresholdKm}
+                  playheadSec={st.view.playbackOffsetSec}
+                  marks={[
+                    ...(b.perObject[chartObj.key] ? [{ scenario: 'baseline' as const, t: b.perObject[chartObj.key].elapsedSec, km: b.perObject[chartObj.key].separationKm }] : []),
+                    ...(e.perObject[chartObj.key] ? [{ scenario: 'experiment' as const, t: e.perObject[chartObj.key].elapsedSec, km: e.perObject[chartObj.key].separationKm }] : []),
+                  ]}
                 />
-              )}
+                {focusEvent && focusEvent.key === chartObj.key && (
+                  <EncounterInset
+                    snap={snap}
+                    obj={chartObj}
+                    traj={traj}
+                    epochMs={focusEvent.scenarioId === 'baseline' ? epochs.baseline : epochs.experiment}
+                    tauSec={focusEvent.elapsedSec}
+                    thresholdKm={sat.thresholdKm}
+                    color={focusEvent.scenarioId === 'baseline' ? COLORS.baseline : COLORS.experiment}
+                  />
+                )}
+              </div>
             </div>
           )}
+
           <details className="explain">
-            <summary>Run details & coverage</summary>
+            <summary>Details</summary>
             <div>
               <p className="fine">
-                Screening set: {snap?.label} — {snap?.objects.length} objects. {snap?.selectionNote} Display filters (search, horizon) never change it.
+                {snap?.label} · {snap?.objects.length} objects · {snap?.selectionNote}
               </p>
-              <RunMeta r={b} />
-              <RunMeta r={e} />
-              <p className="fine">Worker: {rt.workerMode}. Positions are SGP4 estimates in an Earth-fixed frame (GMST rotation); the ascent is an illustrative Earth-fixed profile. No relative speed is reported.</p>
+              <div className="prox-meta-grid">
+                <RunMeta r={b} />
+                <RunMeta r={e} />
+              </div>
+              {cmp && cmp.coverageNotes.length > 0 && <p className="fine">{cmp.coverageNotes.join(' ')}</p>}
+              <p className="fine">
+                Engine: {rt.workerMode} · SGP4 estimates, Earth-fixed frame · ids:{' '}
+                {[b.minimum, e.minimum].filter(Boolean).map((m) => idOf(m!)).join(', ')}
+              </p>
             </div>
           </details>
         </div>
       )}
 
-      <p className="prox-disclaimer">{RESULT_DISCLAIMER}</p>
       <div className="prox-foot">
+        <span className="prox-disclaimer" title={RESULT_DISCLAIMER}>
+          Estimated positions · illustrative ascent · not a collision prediction
+        </span>
+        <span className="grow" />
         <SyntheticTourButton />
       </div>
     </section>

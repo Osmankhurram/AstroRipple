@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { conversation, useConversation, type Entry } from '@/state/conversation';
 import type { HighlightTarget } from '@/state/reducer';
-import { store } from '@/state/store';
+import { store, useInvestigation } from '@/state/store';
 import { IconSend } from './icons';
 import { WeatherDetails } from './WeatherIndicator';
 
@@ -11,6 +11,14 @@ export const SUGGESTIONS = [
   { label: 'Polar orbit', icon: '90°', q: 'Show me a polar orbit.' },
   { label: 'Why yellow?', icon: '▲', q: 'Why is the weather yellow?' },
   { label: 'Window A vs B', icon: 'A·B', q: 'Compare the two supplied windows.' },
+];
+
+/** Context-aware: in Satellite Mode the chips switch to satellite questions. */
+export const SAT_SUGGESTIONS = [
+  { label: 'Find the ISS', icon: '◎', q: 'Find the ISS and follow it.' },
+  { label: 'Closest object?', icon: '◆', q: 'Which screened satellite comes closest to this sample ascent?' },
+  { label: '+10 min delay', icon: '+10', q: 'Compare the original launch with a ten-minute delay.' },
+  { label: 'Will it collide?', icon: '?', q: 'Will it collide?' },
 ];
 
 /** Split "Changed: … Observed: … Meaning: … Limit: …" answers; fall back to sentences. */
@@ -123,6 +131,8 @@ function EntryView({ e, newest }: { e: Entry; newest: boolean }) {
 
 export function InvestigationPanel() {
   const c = useConversation();
+  const satMode = useInvestigation().satellite.enabled;
+  const chips = satMode ? SAT_SUGGESTIONS : SUGGESTIONS;
   const [q, setQ] = useState('');
   const listRef = useRef<HTMLOListElement>(null);
   const last = c.entries[c.entries.length - 1];
@@ -144,7 +154,6 @@ export function InvestigationPanel() {
       <div className="ask-head">
         <div className="ask-intro">
           <h2 id="ask-h">Ask AstroRipple</h2>
-          <p>Your mission, explored one question at a time.</p>
         </div>
         {c.ai.checked ? (
           c.ai.available ? (
@@ -171,7 +180,7 @@ export function InvestigationPanel() {
               <circle cx="30" cy="13.4" r="2" fill="var(--signal)" />
             </svg>
             <h3 className="ask-empty-title">One change.<br />A new perspective.</h3>
-            <p className="ask-empty-copy">Shift a launch, explore an orbit, or compare windows. Watch your question take shape on the globe.</p>
+            <p className="ask-empty-copy">{satMode ? 'Ask what the ascent passes near — the globe answers.' : 'Ask a what-if. Watch it happen on the globe.'}</p>
           </li>
         ) : (
           c.entries.map((e) => <EntryView key={e.id} e={e} newest={e.id === newestAssistant} />)
@@ -179,9 +188,9 @@ export function InvestigationPanel() {
       </ol>
 
       <div className="ask-suggestions">
-        <span className="ask-suggestions-label">{empty ? 'Start with a question' : 'Explore another change'}</span>
+        <span className="ask-suggestions-label">{satMode ? 'Satellite questions' : empty ? 'Try' : 'Next'}</span>
         <div className="chips row" role="group" aria-label="Suggested questions">
-          {SUGGESTIONS.map((s) => (
+          {chips.map((s) => (
             <button
               key={s.q}
               type="button"
@@ -223,7 +232,7 @@ export function InvestigationPanel() {
             {c.busy ? '…' : <IconSend />} Ask
           </button>
         </form>
-        <p className="ask-hint" id="ask-hint">{c.busy ? 'Investigating your scenario…' : 'Enter to ask · Changes stay in sync with the controls.'}</p>
+        <p className="ask-hint" id="ask-hint">{c.busy ? 'Investigating…' : 'Every answer moves the same controls you can use by hand.'}</p>
       </div>
     </section>
   );

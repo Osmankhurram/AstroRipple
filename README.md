@@ -2,232 +2,105 @@
 
 **Ask why about a rocket launch — and see the answer happen.**
 
-AstroRipple is an interactive 3D "what if?" exhibit for a rocket launch. A countdown tells you
-*when* a launch is scheduled; AstroRipple shows *why* time, launch site, orbit, and weather
-matter. Ask a question (or use the controls), and the app changes an experiment copy of the
-mission, animates the consequence on a WebGL globe next to the untouched baseline, and explains the
-result from the actual calculation.
+A countdown tells you *when* a launch happens. AstroRipple shows *why the time matters*. Ask a
+"what if?", or move a control. AstroRipple changes an experiment copy of the mission and animates
+the consequence on a 3D globe next to the untouched baseline. It then explains the result from the
+actual calculation. **Satellite Mode** adds real cataloged satellites and asks: *if we launch later,
+what else is moving through the space our rocket would occupy?*
 
 ```
 question → validated AI tool call → deterministic calculation → visible 3D change → grounded explanation
 ```
 
-> Educational simulation. The mission, windows, and weather are fictional demo data. Nothing here
-> is operational launch guidance.
+> Educational simulation. The mission, windows and weather are fictional demo data, satellite
+> positions are SGP4 estimates, and the ascent is illustrative. Nothing here is launch guidance or
+> collision risk.
 
-## Track 2 — The Launch Watcher: coverage
+## Documentation
 
-| Requirement | Where |
+| Read | For |
 |---|---|
-| Web-based public launch dashboard | Whole app (`src/components/App.tsx`) |
-| Countdown to the next available launch window | Mission strip → *Countdown to next supplied window* (wall clock; handles open / next window / none / tentative) |
-| 2D/3D trajectory **or** satellite path around Earth | Interactive WebGL globe: target orbital plane, orbit, moving satellite marker, direction arrows; 2D schematic fallback without WebGL. **Satellite Mode**: real cataloged objects (CelesTrak GP data, SGP4 estimates), selected-object trail, an illustrative time-parameterised ascent, and launch proximity screening |
-| Green/yellow/red weather-impact indicator | Mission strip, result strip, and evidence cards (demo heuristic, thresholds documented) |
-| Bonus: viewing map | Not implemented — the cloud-cover "viewing note" is the only viewing guidance (see Limitations) |
-
-Differentiator: the AI-controlled baseline-vs-experiment comparison, with every AI action also
-available as a manual control.
-
-## Satellite Mode — "If we launch later, what else is moving through the space our rocket would occupy?"
-
-Turn on **Satellite Mode** (globe toolbar):
-
-- **Now — estimated positions** shows cataloged objects propagated to the wall clock.
-- **Scenario time — predicted positions** shows the baseline and experiment panes, each at its own
-  launch epoch plus elapsed time. The countdown and weather are unchanged.
-- Pick a screening set: Space stations, the Active LEO sample (250), All active LEO (broad), or the
-  fictional Synthetic demo. Search by name or NORAD ID, select or hover an object for its estimated
-  altitude, coordinates, element epoch and source status, then *Follow* it.
-- **Analyze launch proximity** runs *Launch proximity screening — educational* in a Web Worker. It
-  compares the illustrative ascent with every screened object at the same instants, refines each
-  minimum, and lists potential close approaches within the chosen demonstration distance. It shows
-  both scenarios' minima, a same‑object comparison, a distance‑vs‑time chart, a local encounter inset
-  with its own km scale, slow replay, and full run metadata.
-- *▶ Synthetic encounter demo* runs an offline guided replay with fictional objects. It shows a
-  potential close approach, a 10‑minute delay that changes which object comes near, paths that cross
-  at different times, and an object over the same map position but 300 km higher.
-
-AI tools (live Claude and scripted mode): `set_satellite_mode`, `set_satellite_time_source`,
-`select_satellite`, `set_screening_catalog`, `screen_launch_proximity`, `focus_close_approach`,
-`compare_launch_offsets` (≤ 3 offsets) and `explain_proximity_concepts`, alongside the existing
-`set_launch_offset`. Try: *"Show me the satellites around Earth right now"*, *"Find the ISS and follow
-it"*, *"Which screened satellite comes closest to this sample ascent?"*, *"Compare the original launch
-with a ten-minute delay"*, *"Show me that encounter in slow motion"*, *"Will it collide?"*
-
-> Positions are SGP4 estimates from public orbital elements, not live telemetry. The ascent is
-> illustrative. Close approaches do not establish collision probability or operational launch safety.
-> See [docs/SATELLITES.md](docs/SATELLITES.md) for data policy, frames, algorithm and limits.
+| **[docs/GUIDE.md](docs/GUIDE.md)** | Every feature, how to use it, what each number means, glossary, FAQ |
+| **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** | System design: components, data flows, APIs, design decisions |
+| **[docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md)** | Pitch, 3‑minute demo run, judge Q&A, Track 2 checklist |
+| [docs/SIMULATION.md](docs/SIMULATION.md) | Orbital‑geometry and weather model, formulas, assumptions |
+| [docs/SATELLITES.md](docs/SATELLITES.md) | Orbital data policy, SGP4 frames, ascent, screening algorithm, limits |
 
 ## Quick start
 
-Requirements: Node.js 20+ (tested with Node 22) and npm.
+Requires Node.js 20+ (tested with Node 22).
 
 ```bash
 npm install
-npm run dev          # http://localhost:3000
+npm run dev            # http://localhost:3000
+# production
+npm run build && npm start
 ```
 
-Production:
+No keys, accounts or network access are required.
 
-```bash
-npm run build
-npm start            # http://localhost:3000
-```
+- **Without an API key**, the Ask panel runs in labelled *Scripted* mode, which uses the same tools.
+- **Satellite Mode** downloads CelesTrak data through a server cache when it can. Otherwise it serves
+  a bundled snapshot labelled with its epoch.
+- The **synthetic encounter demo** is fully offline.
 
-No API keys, accounts, or network access are needed: without a key the investigation panel runs in
-clearly labelled **Scripted demo mode**, and all mission data comes from local fixtures. Satellite Mode
-downloads CelesTrak data server-side when reachable (cached, ≥ 2 h between downloads) and otherwise
-serves a bundled snapshot labelled with its original epoch; the synthetic demonstration is fully offline.
-
-### Optional configuration
-
-Copy `.env.example` to `.env.local`:
-
-| Variable | Purpose |
+| Optional env (`.env.local`) | Effect |
 |---|---|
-| `ANTHROPIC_API_KEY` | Enables live Claude tool-calling (server-side only; never sent to the browser). |
-| `ANTHROPIC_MODEL` | Model id (default `claude-opus-5-5`). Must support tool use. |
-| `LD_AI_EFFORT` | `low` (default) / `medium` / `high` — lower is faster for short explanations. |
-| `LD_ENABLE_LIVE_DATA` | `1` lets the optional *Real-world feed* card call Launch Library 2 and Open-Meteo (server-cached). |
-| `LD_SATELLITE_SOURCE` | `celestrak` (default): Satellite Mode uses CelesTrak GP data through the shared server cache (≥ 2 h refresh). `fixture`: never contact the provider; use the bundled, epoch-labelled snapshot. |
-| `LD_SATELLITE_CACHE_DIR` | Where the server persists the CelesTrak cache (default `.cache/celestrak`). Multi-instance/serverless deployments need a shared store instead. |
-
-For `claude-opus-5-5`, `claude-opus-5`, `claude-fable-5-1`, and `claude-sonnet-5-5`, the route sends
-the server-side refusal fallback (`fallbacks: "default"`, beta `server-side-fallback-2026-07-01`). Other
-models are called without it.
-
-### Tests
+| `ANTHROPIC_API_KEY` | Live Claude tool‑calling (server‑side only) |
+| `ANTHROPIC_MODEL` / `LD_AI_EFFORT` | Model id (default `claude-opus-5-5`) / `low`·`medium`·`high` |
+| `LD_ENABLE_LIVE_DATA=1` | Real‑world feed card (Launch Library 2 + Open‑Meteo) |
+| `LD_SATELLITE_SOURCE=fixture` | Never contact CelesTrak (offline demos) |
+| `LD_SATELLITE_CACHE_DIR` | Where the CelesTrak cache persists (default `.cache/celestrak`) |
 
 ```bash
-npm test             # 120 unit/integration tests (vitest)
+npm test               # 120 unit/integration tests (vitest)
 npm run typecheck
 ```
 
-## How to use it
+## What's inside
 
-- Click a suggestion — *"What if we launch two hours later?"*, *"Show me a polar orbit."*, *"Why is
-  the weather yellow?"*, *"Compare the two supplied windows."* — or type a question.
-- Or use the manual controls under the globe: delay slider and ±15 min / ±1 h buttons, orbit presets,
-  launch site, comparison toggle, play/pause and playback scrubber, undo, reset.
-- Camera: drag to rotate, scroll to zoom; *Overview*, *Focus launch site*, *View orbital plane*
-  buttons. Keyboard on a focused globe: arrows rotate, `+`/`-` zoom, `0` resets.
-- **Guided investigation** (top bar) runs an 8-step, network-free presentation (≈75 s with Auto, or
-  step with *Next*). It is cancellable and restartable.
-- *Reduced motion* (or the OS setting) applies changes instantly and disables camera fly-throughs.
+- **Telemetry rail**: a live countdown to the next supplied window and green/yellow/red weather
+  lights that explain themselves.
+- **3D globe**: Earth rotates under a fixed target orbital plane. Compare the baseline and the
+  experiment side by side, and see Earth rotation vs the site‑to‑plane angle.
+- **Experiment controls**: shift the launch time (±12 h), change the orbit or the site, play back,
+  undo or reset. Every control has an AI twin.
+- **◉ Best view**: where to watch the launch. A spot on land with a side‑on view of the climb, the
+  direction to look, and a Good / Fair / Poor rating from the launch‑time weather.
+- **Playback bar**: a video‑style timeline on the globe (play, scrub, speed, close‑approach markers).
+- **Ask AstroRipple**: Claude chooses from 16 validated tools. The browser applies the same actions
+  as the manual controls, and only if the scenario hasn't changed in the meantime.
+- **Satellite Mode**: real CelesTrak objects at SGP4‑estimated positions, with search, follow,
+  trails and an above‑horizon filter. *Launch proximity screening* compares an illustrative ascent
+  with every screened object for the baseline and a delayed experiment. It includes replay, a
+  distance chart and a local close‑up.
+- **Guided tour** and **synthetic encounter demo**: offline, step‑by‑step stories driven by the same
+  engine.
 
-## Architecture
+## Track 2 — The Launch Watcher
 
-```
-src/
-  simulation/          pure, deterministic, no React/AI/rendering
-    coordinates.ts     demo inertial frame, Earth rotation, vectors
-    orbits.ts          presets, plane normal/basis, plane construction, site-to-plane angle
-    weather.ts         demo green/yellow/red heuristic with reasons
-    scenario.ts        Scenario type + validated transforms (offset, preset, site)
-    metrics.ts         derived metrics used by every UI element, tool, and label
-  data/
-    demoMission.ts     fictional Detective-1 mission, windows, curated sites, weather fixture
-    launchAdapter.ts   optional Launch Library 2 parser + cached fetch
-    weatherAdapter.ts  optional Open-Meteo parser + cached fetch
-    fixtures/          CelesTrak GP snapshots (stations; 250-object active sample) for offline use
-  satellites/          Satellite Mode science — pure, no React/three.js
-    time.ts            central UTC parsing (CelesTrak EPOCH has no zone suffix)
-    omm.ts             OMM record validation, NORAD ids at full width, de-duplication
-    catalogs.ts        presets = screening sets, selection rules, snapshot metadata
-    propagation.ts     satellite.js SGP4 wrapper, TEME→ECF (GMST), element-age policy
-    ascent.ts          LaunchTrajectory contract + illustrative Earth-fixed ascent
-    screening.ts       coarse + golden-section closest-approach screening, comparison
-    synthetic.ts       fictional objects for the constructed encounter demo
-    scenarioTime.ts    launch epochs per scenario, screening-input keys
-    worker/            Web Worker engine (display positions + cancellable screening)
-    server/            CelesTrak shared cache (policy, coalescing, persistence, failure hold)
-  state/
-    reducer.ts         single source of truth (baseline, experiment, undo, view) — pure reducer
-    applyRemote.ts     client acceptance of AI actions: re-validate, reject stale/duplicate, atomic
-    store.ts           tiny external store + per-frame playback clock + camera sync bus
-    clock.ts           wall-clock countdown (independent of experiments and playback)
-    conversation.ts    conversation log + AI client (live / scripted / fallback)
-  ai/
-    toolSchemas.ts     zod validation + JSON schemas for the 7 tools
-    toolExecutor.ts    deterministic executor shared by the server loop, scripted mode, guided mode
-    protocol.ts        request/response schemas, snapshot → canonical state rebuild
-    systemPrompt.ts    static (cacheable) system prompt
-    scripted.ts        no-key fallback: intent matching + templates from real tool results
-    config.ts          server-only model/effort config
-  render/
-    frameAdapter.ts    THE single sim→three.js coordinate adapter (z-up → y-up, proper rotation)
-    earthTexture.ts    Earth texture drawn locally from Natural Earth land polygons
-  components/          React UI (GlobeScene, ComparisonView, InvestigationPanel, ...)
-  app/api/
-    investigate/       POST — Claude tool loop (server-side)
-    status/            GET  — AI availability (boolean + model id only)
-    satellites/        GET  — catalog snapshot from the shared CelesTrak cache
-    live/              GET  — optional real-world feed
-```
+| Requirement | Where |
+|---|---|
+| Web‑based public launch dashboard | The whole app |
+| Countdown to the next launch window | Telemetry rail (wall clock; open / next / none / tentative states) |
+| 2D/3D trajectory or satellite path | WebGL globe: target orbit, satellite marker, real cataloged objects, trails, illustrative ascent; 2D fallback without WebGL |
+| Green/yellow/red weather indicator | Telemetry rail, readout, AI evidence (demo heuristic, thresholds documented) |
+| Bonus: viewing map | **◉ Best view**: the best place to watch on the globe, with the visible stretch of the ascent, line of sight and weather rating (geometry + demo weather) |
 
-### AI action protocol
+## Tech
 
-1. The browser sends `requestId`, the question, a compact snapshot (`revision`, mission anchor,
-   experiment offset/preset/site), and a short text-only history.
-2. The server **rebuilds canonical state** from the snapshot with the same reducer (it never trusts
-   client-sent plane angles), then runs a capped Claude tool loop (≤4 model calls, ≤6 tool calls).
-   Each tool call is validated with zod and executed by the deterministic executor against a working
-   copy; the actual result (before/after metrics, facts, provenance, limitations) is returned to
-   Claude for a grounded explanation.
-3. The server returns proposed, validated actions — it never claims to have changed the client.
-4. The browser re-validates the actions and applies them atomically through the shared reducer only
-   if its revision still equals `baseRevision` and the `requestId` was not applied before. If the user
-   changed the scenario in the meantime, the answer is discarded and labelled as stale.
-
-Manual controls, scripted mode, guided mode, and the AI all dispatch the same reducer actions;
-`tests/tools.test.ts` checks that manual and AI paths produce identical canonical state.
-
-### Scene graph
-
-Earth-fixed objects (Earth mesh, launch marker) live in a group rotated by θ(t). Inertial objects
-(target-plane disc, orbit, satellite, direction arrows, site-to-plane annotation, baseline ghost
-marker, equator, axis) are siblings, so the plane cannot accidentally rotate with Earth. Displayed
-geometry interpolates toward the canonical state over ~1.2 s; canvas labels are computed from the
-displayed geometry, and the result strip shows "Updating geometry…" until the transition lands.
-
-See [docs/SIMULATION.md](docs/SIMULATION.md) for the model, formulas, and limitations, and
-[docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md) for the 60–90 second presentation.
-
-## Data and provenance
-
-Each panel carries its own provenance badge (schedule, weather, geometry):
-
-- **Demo** — fictional Detective-1 mission. Window A opens at the next 21:45 UTC at least two hours
-  away; Window B is three hours later (crossing midnight UTC by design). Weather is an hourly fixture
-  relative to Window A.
-- **Live / Cached** — only in the optional *Real-world feed* card (Launch Library 2 schedules,
-  Open-Meteo forecast for the Florida coast), cached server-side (30 min / 15 min). Real launches are
-  never given demo data, and dates less precise than a minute get no seconds-level countdown.
-- **Computed (illustrative)** — all orbital geometry.
-
-## Limitations
-
-- Spherical Earth, circular orbits, illustrative frame orientation, frozen target plane, no nodal
-  precession, no orbital phasing, no ascent trajectory, no vehicle performance.
-- The site-to-plane angle is a geometric separation — not a steering angle, fuel cost, or
-  feasibility verdict. Geometric alignment alone never establishes a valid launch window.
-- Weather colours use teaching thresholds, not launch-commit criteria; demo weather exists only for
-  the mission's own site (elsewhere "unknown").
-- The SSO preset shows SSO-like near-polar retrograde geometry only; sun-synchronism is not simulated.
-- Not implemented: ascent viewing map (bonus), shareable URL state, speech.
-- Satellite Mode: SGP4 estimates only; no covariance or collision probability; ascent is illustrative,
-  Florida-only, and ends at T+540 s; no relative speeds; "Above horizon" is geometry, not visibility;
-  the public catalog is not a complete inventory. Details in docs/SATELLITES.md.
-- The live Claude path was verified with a mocked SDK in tests; it needs a real `ANTHROPIC_API_KEY`
-  to run end-to-end.
+Next.js 16 · React 19 · three.js / React Three Fiber · satellite.js (SGP4) · zod · Anthropic SDK ·
+vitest. The simulation and satellite modules are pure TypeScript and run unchanged in the browser,
+the Web Worker, the server and the tests.
 
 ## Credits
 
 - Coastlines: [Natural Earth](https://www.naturalearthdata.com/) (public domain) via
   [world-atlas](https://github.com/topojson/world-atlas) (ISC).
-- 3D: three.js, React Three Fiber, drei. AI: Anthropic TypeScript SDK.
-- Optional data: [Launch Library 2](https://thespacedevs.com/llapi), [Open-Meteo](https://open-meteo.com/).
-- Orbital elements: [CelesTrak](https://celestrak.org/) GP data ([formats](https://celestrak.org/NORAD/documentation/gp-data-formats.php),
-  [usage policy](https://celestrak.org/usage-policy.php)); SGP4 propagation: [satellite.js](https://github.com/shashwatak/satellite-js) (MIT).
-- Background reading: CelesTrak coordinate-frame columns; NASA Earth Observatory *Catalog of Earth
-  Satellite Orbits*.
+- Orbital elements: [CelesTrak](https://celestrak.org/) GP data
+  ([formats](https://celestrak.org/NORAD/documentation/gp-data-formats.php),
+  [usage policy](https://celestrak.org/usage-policy.php)).
+- SGP4: [satellite.js](https://github.com/shashwatak/satellite-js) (MIT).
+- 3D: three.js, React Three Fiber, drei.
+- AI: Anthropic TypeScript SDK.
+- Optional data: [Launch Library 2](https://thespacedevs.com/llapi), [Open‑Meteo](https://open-meteo.com/).

@@ -36,6 +36,7 @@ const ActionSchema: z.ZodType<Action> = z.discriminatedUnion('type', [
   z.object({ type: z.literal('SET_PLAYBACK_SPEED'), speed: z.union(PLAYBACK_SPEEDS.map((v) => z.literal(v)) as unknown as [z.ZodLiteral<number>, z.ZodLiteral<number>]) }).strict(),
   z.object({ type: z.literal('SET_PLAYING'), playing: z.boolean() }).strict(),
   z.object({ type: z.literal('SET_PLAYBACK'), seconds: z.number().min(0).max(3 * 3600) }).strict(),
+  z.object({ type: z.literal('SET_VIEWING'), on: z.boolean() }).strict(),
 ]) as unknown as z.ZodType<Action>;
 
 export type ApplyStatus = 'applied' | 'stale' | 'duplicate' | 'invalid';

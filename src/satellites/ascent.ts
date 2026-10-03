@@ -44,20 +44,24 @@ export const ASCENT_FEASIBILITY_NOTE = 'Ascent timing illustration; target-orbit
 // (≈7.2 km/s Earth-relative horizontal speed at the end). Azimuth 53.4° (≈ the azimuth for a 45°
 // inclination from 28.5°N, ignoring Earth-rotation correction). Positions: WGS-84 geodetic → ECF.
 
-const ASCENT_END_S = 540;
+export const ASCENT_END_S = 540;
 const STEP_S = 10;
 const SITE = { lat: 28.49, lon: -80.58 }; // matches LAUNCH_SITES['florida-coast']
 const AZIMUTH_DEG = 53.4;
 const R_MEAN = 6371;
 
-function ascentPoint(t: number): V3 {
+/**
+ * The illustrative ascent profile flown from any site along any azimuth (ECF km, rounded to 1 m).
+ * Used for the Satellite Mode fixture (Florida, 53.4°) and for the "Best view" planner at other sites.
+ */
+export function illustrativeAscentPoint(t: number, siteLatDeg: number = SITE.lat, siteLonDeg: number = SITE.lon, azimuthDeg: number = AZIMUTH_DEG): V3 {
   const x = t / ASCENT_END_S;
   const h = 230 * Math.pow(Math.sin((Math.PI * t) / (2 * ASCENT_END_S)), 1.4);
   const s = 1404 * (0.25 * x * x + 0.75 * x * x * x);
   const d = s / R_MEAN;
-  const p1 = (SITE.lat * Math.PI) / 180;
-  const l1 = (SITE.lon * Math.PI) / 180;
-  const az = (AZIMUTH_DEG * Math.PI) / 180;
+  const p1 = (siteLatDeg * Math.PI) / 180;
+  const l1 = (siteLonDeg * Math.PI) / 180;
+  const az = (azimuthDeg * Math.PI) / 180;
   const p2 = Math.asin(Math.sin(p1) * Math.cos(d) + Math.cos(p1) * Math.sin(d) * Math.cos(az));
   const l2 = l1 + Math.atan2(Math.sin(az) * Math.sin(d) * Math.cos(p1), Math.cos(d) - Math.sin(p1) * Math.sin(p2));
   const e = geodeticToEcf({ latitude: p2, longitude: l2, height: h });
@@ -67,7 +71,7 @@ function ascentPoint(t: number): V3 {
 
 function buildIllustrativeAscent(): LaunchTrajectory {
   const samples: AscentSample[] = [];
-  for (let t = 0; t <= ASCENT_END_S; t += STEP_S) samples.push({ elapsedSeconds: t, positionKm: ascentPoint(t) });
+  for (let t = 0; t <= ASCENT_END_S; t += STEP_S) samples.push({ elapsedSeconds: t, positionKm: illustrativeAscentPoint(t) });
   return {
     id: 'illustrative-florida-ne',
     label: 'Illustrative ascent — Florida coast, north-east, to ~230 km',

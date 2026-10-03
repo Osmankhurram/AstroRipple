@@ -1,9 +1,9 @@
 'use client';
-/** Readout card: four computed rows (baseline → experiment), details in tooltips. */
+/** Slim "what changes" strip under the globe: four computed numbers, baseline → experiment. */
 import { computeMetrics } from '@/simulation/metrics';
 import { fmtOffset } from '@/simulation/scenario';
 import { useInvestigation } from '@/state/store';
-import { InfoTip, ProvenanceDot, useTransitioning, useTween } from './ui';
+import { InfoTip, useTransitioning, useTween } from './ui';
 import { WeatherChip } from './WeatherIndicator';
 
 function signed(x: number, digits = 1) {
@@ -31,67 +31,34 @@ export function ResultStrip() {
   const r4 = pulse(hl === 'weather' || hl === 'windows', 'w');
 
   return (
-    <section className={`card readout-card ${transitioning ? 'updating' : ''}`} aria-labelledby="ro-h" aria-busy={transitioning}>
-      <header>
-        <h2 id="ro-h" className="label plain">
-          What changes
-        </h2>
-        <span className="ro-key" aria-hidden="true">
-          <span className="b">Baseline</span>→<span className="e">Experiment</span>
+    <section className={`stats ${transitioning ? 'updating' : ''}`} aria-label="What changes, baseline to experiment" aria-busy={transitioning}>
+      <div className={`stat ${r1.className}`} key={r1.key} aria-hidden="true">
+        <span className="label">Shift</span>
+        <span className="v x">{e.offsetMinutes === 0 ? '0 h' : fmtOffset(e.offsetMinutes)}</span>
+      </div>
+      <div className={`stat ${r2.className}`} key={r2.key} aria-hidden="true" title="How far Earth turns between the two launch times (≈15.04° per hour)">
+        <span className="label">Earth turns</span>
+        <span className="v">{signed(rot)}°</span>
+      </div>
+      <div className={`stat angle ${r3.className}`} key={r3.key}>
+        <span className="label">
+          ∠ Site–plane <InfoTip label="About the site-to-plane angle">{ANGLE_DISCLAIMER}</InfoTip>
         </span>
-        <ProvenanceDot p="computed" label="Readout" />
-      </header>
-
-      <div className="readout-grid">
-        <div className={`readout ${r1.className}`} key={r1.key} aria-hidden="true">
-          <span className="label">Shift</span>
-          <div className="big">
-            <span className="x">{e.offsetMinutes === 0 ? '0 h' : fmtOffset(e.offsetMinutes)}</span>
-            {e.offsetMinutes !== 0 && <span className="tag">Hypothetical</span>}
-          </div>
-        </div>
-
-        <div className={`readout ${r2.className}`} key={r2.key}>
-          <div className="head">
-            <span className="label">Earth rotation</span>
-            <InfoTip label="About Earth rotation">How far Earth turns between the two launch times (sidereal rate 7.292115×10⁻⁵ rad/s, ≈15.04° per hour). This is not the site-to-plane angle.</InfoTip>
-          </div>
-          <div className="big" aria-hidden="true">
-            {signed(rot)}°
-          </div>
-        </div>
-
-        <div className={`readout angle ${r3.className}`} key={r3.key}>
-          <div className="head">
-            <span className="label">∠ Site-to-plane</span>
-            <InfoTip label="About the site-to-plane angle">{ANGLE_DISCLAIMER}</InfoTip>
-          </div>
-          <div className="big" aria-hidden="true">
-            <span className="b">{b.siteToPlaneAngleDeg.toFixed(1)}°</span>
-            <span className="arrow">→</span>
-            <span className="e">{ang.toFixed(1)}°</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }} aria-hidden="true">
-            <span className="delta">Δ {signed(e.siteToPlaneAngleDeg - b.siteToPlaneAngleDeg)}°</span>
-            <span className="sub" title={p ? 'Each scene measured at the same time after its own launch' : 'At the launch instant'}>
-              at T+{p ? `${Math.floor(p / 60)}m` : '0'}
-            </span>
-          </div>
-        </div>
-
-        <div className={`readout ${r4.className}`} key={r4.key}>
-          <div className="head">
-            <span className="label">Weather at launch</span>
-            <InfoTip label="About the weather indicator">Demo heuristic using teaching thresholds — not launch rules or a probability of approval.</InfoTip>
-          </div>
-          <div className="big" aria-hidden="true">
-            <WeatherChip status={b.weatherStatus} small />
-            <span className="arrow">→</span>
-            <WeatherChip status={e.weatherStatus} small />
-            <span className="sub">{e.weatherStatus === b.weatherStatus ? 'same' : 'changed ◆'}</span>
-          </div>
-        </div>
-
+        <span className="v" aria-hidden="true">
+          <b>{b.siteToPlaneAngleDeg.toFixed(1)}°</b>
+          <i>→</i>
+          <em>{ang.toFixed(1)}°</em>
+        </span>
+      </div>
+      <div className={`stat ${r4.className}`} key={r4.key}>
+        <span className="label">
+          Weather <InfoTip label="About the weather indicator">Demo heuristic using teaching thresholds — not launch rules or a probability of approval.</InfoTip>
+        </span>
+        <span className="v" aria-hidden="true">
+          <WeatherChip status={b.weatherStatus} small />
+          <i>→</i>
+          <WeatherChip status={e.weatherStatus} small />
+        </span>
       </div>
       <p className="sr-only" aria-live="polite">
         {transitioning

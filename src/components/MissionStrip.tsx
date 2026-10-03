@@ -1,10 +1,10 @@
 'use client';
 /**
- * Status rail: one recessed instrument well with the wall-clock countdown and the two supplied
- * windows (each with its weather light). Details live in popovers.
+ * Telemetry rail: mission identity · wall-clock countdown · the two supplied windows. Each weather
+ * light is itself the button that opens its evidence (progressive disclosure, no extra "why" text).
  */
 import { useEffect, useState } from 'react';
-import type { LaunchWindow } from '@/data/demoMission';
+import { LAUNCH_SITES, type LaunchWindow } from '@/data/demoMission';
 import { computeMetrics } from '@/simulation/metrics';
 import { countdown, fmtUtc, formatCountdown } from '@/state/clock';
 import { store, useInvestigation } from '@/state/store';
@@ -26,9 +26,7 @@ function Countdown() {
   return (
     <div className="rail-cell count">
       <div className="row">
-        <span className="label">Next window</span>
-        <ProvenanceDot p={st.mission.scheduleProvenance} label="Schedule" />
-        <InfoTip label="About the countdown">Counts down on your clock to the next supplied window. What-if experiments never change this schedule.</InfoTip>
+        <span className="label" title="Counts down on your clock to the next supplied window. What-if experiments never change it.">Next window</span>
       </div>
       {c.state === 'upcoming' && (
         <>
@@ -66,35 +64,25 @@ function WindowCell({ w, className }: { w: LaunchWindow; className: string }) {
   return (
     <div className={`rail-cell ${className} ${hl ? 'pulse' : ''}`} key={hl ? `hl-${st.view.highlightNonce}` : 'idle'}>
       <div className="row">
-        <span className="label">
-          Window {w.id}
-          {w.id === 'A' ? <span className="win-primary"> · primary</span> : ''}
-        </span>
-        {w.id === 'A' && (
-          <InfoTip label="About the windows">Two fictional windows supplied with the mission. AstroRipple compares them; it never invents new ones.</InfoTip>
-        )}
+        <span className="label" title="A fictional window supplied with the mission. Select the weather light to see why.">Window {w.id}</span>
       </div>
-      <div className="row">
+      <div className="row win-row">
         <span className="window-time">
-          {pad(d.getUTCHours())}:{pad(d.getUTCMinutes())}{' '}
-          <span className="window-date">UTC · {fmtUtc(w.startUtc).split(' ').slice(0, 2).join(' ')}</span>
+          {pad(d.getUTCHours())}:{pad(d.getUTCMinutes())}
+          <span className="window-date"> UTC · {fmtUtc(w.startUtc).split(' ').slice(0, 2).join(' ')}</span>
         </span>
-      </div>
-      <div className="row">
         <Popover
           align={w.id === 'B' ? 'right' : 'left'}
-          className="btn sm ghost why-btn"
+          className="why-btn"
           ariaLabel={`Weather ${LABEL[m.weatherStatus]} for window ${w.id}. Show why.`}
           label={
-            <>
-              <span className={`wx-chip wx-${m.weatherStatus}`}>
-                <span className="glyph" aria-hidden="true">
-                  {ICON[m.weatherStatus]}
-                </span>
-                {LABEL[m.weatherStatus]}
+            <span className={`wx-chip wx-${m.weatherStatus}`}>
+              <span className="glyph" aria-hidden="true">
+                {ICON[m.weatherStatus]}
               </span>
-              <span>Why ›</span>
-            </>
+              {LABEL[m.weatherStatus]}
+              <span className="chev" aria-hidden="true">▾</span>
+            </span>
           }
         >
           {(close) => (
@@ -124,10 +112,30 @@ function WindowCell({ w, className }: { w: LaunchWindow; className: string }) {
   );
 }
 
+function Identity() {
+  const st = useInvestigation();
+  const site = LAUNCH_SITES[st.mission.defaultSiteId];
+  return (
+    <div className="rail-cell ident">
+      <span className="mission-name">
+        <i className="led breathe" /> Detective-1
+      </span>
+      <span className="row">
+        <ProvenanceDot p={st.mission.scheduleProvenance} label="Schedule" />
+        <span className="window-date">{site.shortName}</span>
+        <InfoTip label="About the mission">
+          <strong>{st.mission.name}</strong> — {site.name}, {st.mission.vehicle.toLowerCase()}. Mission, windows and weather are fictional demonstration data.
+        </InfoTip>
+      </span>
+    </div>
+  );
+}
+
 export function MissionStrip() {
   const st = useInvestigation();
   return (
     <section className="rail" aria-label="Launch status">
+      <Identity />
       <Countdown />
       <WindowCell w={st.mission.windows[0]} className="win-a" />
       <WindowCell w={st.mission.windows[1]} className="win-b" />

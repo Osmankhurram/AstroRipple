@@ -81,6 +81,15 @@ export function elevationDeg(observer: { latDeg: number; lonDeg: number; altKm?:
   return (la.elevation * 180) / Math.PI;
 }
 
+/** Azimuth (deg from north, clockwise), elevation (deg) and range (km) from an observer to an ECF point. */
+export function lookAngles(observer: { latDeg: number; lonDeg: number; altKm?: number }, satEcf: V3): { azDeg: number; elDeg: number; rangeKm: number } {
+  const la = ecfToLookAngles(
+    { latitude: (observer.latDeg * Math.PI) / 180, longitude: (observer.lonDeg * Math.PI) / 180, height: observer.altKm ?? 0 },
+    { x: satEcf[0], y: satEcf[1], z: satEcf[2] },
+  );
+  return { azDeg: (((la.azimuth * 180) / Math.PI) % 360 + 360) % 360, elDeg: (la.elevation * 180) / Math.PI, rangeKm: la.rangeSat };
+}
+
 export const dist3 = (a: V3, b: V3) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 export const norm3 = (a: V3) => Math.hypot(a[0], a[1], a[2]);
 

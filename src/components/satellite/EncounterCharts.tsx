@@ -81,14 +81,14 @@ export function DistanceChart({
         ))}
         <line x1={pad.l} x2={W - pad.r} y1={y(thresholdKm)} y2={y(thresholdKm)} stroke={SAT_COLORS.approach} strokeDasharray="4 3" strokeWidth={1} />
         <text x={W - pad.r} y={y(thresholdKm) - 4} textAnchor="end" className="tick" fill={SAT_COLORS.approach}>
-          screening distance {thresholdKm} km
+          {thresholdKm} km
         </text>
         <path d={path(series.baseline)} fill="none" stroke={COLORS.baseline} strokeWidth={1.8} />
         <path d={path(series.experiment)} fill="none" stroke={COLORS.experiment} strokeWidth={1.8} strokeDasharray="6 3" />
         {marks.map((m, i) => (
           <g key={i}>
             <circle cx={x(m.t)} cy={y(m.km)} r={4} fill={m.scenario === 'baseline' ? COLORS.baseline : COLORS.experiment} stroke="#0b1016" />
-            <text x={x(m.t) + 6} y={y(m.km) + (m.scenario === 'baseline' ? -6 : 12)} className="tick strong">
+            <text x={x(m.t) > W - 80 ? x(m.t) - 6 : x(m.t) + 6} textAnchor={x(m.t) > W - 80 ? 'end' : 'start'} y={y(m.km) + (m.scenario === 'baseline' ? -6 : 12)} className="tick strong">
               {m.scenario === 'baseline' ? 'B' : 'E'} {fmtKm(m.km)}
             </text>
           </g>
@@ -96,9 +96,9 @@ export function DistanceChart({
         {playheadSec >= v0 && playheadSec <= v1 && <line x1={x(playheadSec)} x2={x(playheadSec)} y1={pad.t} y2={H - pad.b} stroke="#e8edf5" strokeOpacity={0.6} />}
       </svg>
       <figcaption>
-        <span><i className="sw" style={{ background: COLORS.baseline }} /> Baseline (solid)</span>
-        <span><i className="sw dash" style={{ borderColor: COLORS.experiment }} /> Experiment (dashed)</span>
-        <span>Log distance scale · {obj.name}</span>
+        <span><i className="sw" style={{ background: COLORS.baseline }} /> Baseline</span>
+        <span><i className="sw dash" style={{ borderColor: COLORS.experiment }} /> Experiment</span>
+        <span>log scale</span>
       </figcaption>
     </figure>
   );
@@ -161,7 +161,7 @@ export function EncounterInset({ snap, obj, traj, epochMs, tauSec, thresholdKm, 
           {bar} km
         </text>
       </svg>
-      <figcaption>Local view centred on the rocket (▲). Track: object relative to the rocket, ±20 s. Dashed circle: screening distance — not object size.</figcaption>
+      <figcaption>Close-up around the rocket ▲ · ±20 s · ring = {thresholdKm} km (not object size)</figcaption>
     </figure>
   );
 }

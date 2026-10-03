@@ -5,10 +5,13 @@ import { computeMetrics } from '@/simulation/metrics';
 import { fmtOffset, sameScenario, type ScenarioId } from '@/simulation/scenario';
 import { store, useInvestigation } from '@/state/store';
 import { GuidedBar, useGuidedActive } from './GuidedDemo';
-import { IconOverview, IconPlane, IconSite } from './icons';
-import { ANGLE_DISCLAIMER } from './ResultStrip';
+import { IconEye, IconLegend, IconOverview, IconPlane, IconSite } from './icons';
+import { PlaybackBar } from './PlaybackBar';
+import { ResultStrip } from './ResultStrip';
 import { COLORS } from './sceneColors';
-import { InfoTip, Popover, useMediaQuery, useTransitioning, useTween } from './ui';
+import { Popover, useMediaQuery, useTransitioning } from './ui';
+import { ViewingCard } from './ViewingCard';
+import { VIEW_COLOR } from './ViewingLayer';
 import { SatelliteToggle, SatelliteToolbar, SatPaneHud } from './satellite/SatelliteControls';
 import { LABELS, SAT_COLORS } from './satellite/satUi';
 import { paneLaunchEpochMs } from './satellite/paneTime';
@@ -56,7 +59,6 @@ function Hud({ which, showScale }: { which: ScenarioId; showScale: boolean }) {
   const satMode = st.satellite.enabled;
   const sc = which === 'baseline' ? st.baseline : st.experiment;
   const m = computeMetrics(sc, st.baseline, st.mission, st.view.playbackOffsetSec);
-  const angle = useTween(m.siteToPlaneAngleDeg, !st.view.reducedMotion, 1150);
   // In Satellite Mode the header shows the launch epoch actually screened (demonstration epoch for synthetic data).
   const d = new Date(satMode ? paneLaunchEpochMs(st, which) : Date.parse(sc.launchTimeUtc));
   const pad = (x: number) => String(x).padStart(2, '0');
@@ -71,38 +73,12 @@ function Hud({ which, showScale }: { which: ScenarioId; showScale: boolean }) {
         </div>
         <div className="hud-sub">
           <span>
-            {pad(d.getUTCHours())}:{pad(d.getUTCMinutes())} UTC
-          </span>
-          {hypothetical ? <span className="tag">Hypothetical</span> : null}
-          <span>
-            · {PRESET_SHORT[sc.orbitPreset]} {sc.inclinationDeg}°
+            {pad(d.getUTCHours())}:{pad(d.getUTCMinutes())} UTC · {PRESET_SHORT[sc.orbitPreset]} {sc.inclinationDeg}°
           </span>
         </div>
       </div>
       {satMode && <SatPaneHud which={which} />}
-      <div className="hud bl" hidden={satMode}>
-        <div className="hud-angle">
-          <span className="num" aria-hidden="true">
-            ∠ {angle.toFixed(1)}°
-          </span>
-          <span className="label plain">Site-to-plane</span>
-          <InfoTip label="About the site-to-plane angle">{ANGLE_DISCLAIMER}</InfoTip>
-        </div>
-      </div>
-      {showScale && !satMode && (
-        <div className="hud br">
-          <span className="label plain">Not to scale</span>
-          <InfoTip label="About scale">Orbit altitude exaggerated ×3. Lighting and frame orientation are illustrative.</InfoTip>
-        </div>
-      )}
-      {showScale && satMode && (
-        <div className="hud br">
-          <span className="label plain">{LABELS.notToScale}</span>
-          <InfoTip label="About Satellite Mode scale">
-            Satellite markers are enlarged for visibility and never used in calculations. Satellites and the ascent are drawn at true altitude (km) on a unit-radius Earth; Earth’s orientation follows sidereal time (GMST) at the displayed instant. The illustrative target plane is hidden in Satellite Mode.
-          </InfoTip>
-        </div>
-      )}
+      {st.view.viewing ? <ViewingCard which={which} /> : satMode && showScale ? <div className="hud br scale-note">{LABELS.notToScale}</div> : null}
     </>
   );
 }
@@ -111,9 +87,15 @@ function Pane({ which, active, webgl, differs, showScale }: { which: ScenarioId;
   const st = useInvestigation();
   const updating = useTransitioning(st.view.transitionUntil) && which === 'experiment';
   const scen = which === 'baseline' ? COLORS.baseline : COLORS.experiment;
+  const [touched, setTouched] = useState(false);
   return (
     <div className="pane" hidden={!active}>
-      <div className={`porthole ${updating ? 'updating' : ''}`} style={{ ['--scen' as string]: scen } as React.CSSProperties} aria-busy={updating}>
+      <div className={`porthole ${updating ? 'updating' : ''}`} style={{ ['--scen' as string]: scen } as React.CSSProperties} aria-busy={updating} onPointerDown={() => setTouched(true)} onWheel={() => setTouched(true)}>
+        {!touched && webgl && (
+          <span className="drag-hint" aria-hidden="true">
+            Drag to orbit · scroll to zoom
+          </span>
+        )}
         {webgl ? <GlobeCanvas which={which} showGhost={which === 'experiment' && differs} label={which} active={active} /> : <Schematic which={which} />}
         <div className="vignette" aria-hidden="true" />
         <div className="brackets" aria-hidden="true" />
@@ -125,74 +107,47 @@ function Pane({ which, active, webgl, differs, showScale }: { which: ScenarioId;
   );
 }
 
-function SatLegend() {
-  return (
-    <div className="legend" aria-label="Satellite legend">
-      <span>
-        <i className="sw dot" style={{ background: SAT_COLORS.object }} /> Cataloged object (estimated)
-      </span>
-      <span>
-        <i className="sw" style={{ background: COLORS.baseline }} /> Baseline ascent
-      </span>
-      <span>
-        <i className="sw" style={{ background: COLORS.experiment }} /> Experiment ascent
-      </span>
-      <span style={{ color: SAT_COLORS.approach }}>◆ {LABELS.approach}</span>
-      <span className="grow" />
-      <Popover label="More ▾" className="btn sm ghost" ariaLabel="More satellite legend items">
-        <ul className="key-list">
-          <li>
-            <i className="sw dot" style={{ background: SAT_COLORS.selected }} /> ◎ Selected object (large marker)
-          </li>
-          <li>
-            <i className="sw dot" style={{ background: SAT_COLORS.synthetic }} /> Synthetic, fictional object
-          </li>
-          <li>
-            <i className="sw dash" /> Trail: path relative to Earth’s surface, ±½ orbit (dashed = past)
-          </li>
-          <li>
-            <span style={{ width: 22, textAlign: 'center', color: SAT_COLORS.approach }}>┅</span> Separation connector (same instant, km)
-          </li>
-        </ul>
-        <div className="foot-note">{LABELS.notToScale} · positions are SGP4 estimates, not telemetry</div>
-      </Popover>
-    </div>
-  );
-}
-
-function Legend() {
+function LegendItems() {
   const st = useInvestigation();
-  if (st.satellite.enabled) return <SatLegend />;
-  return (
-    <div className="legend" aria-label="Legend">
-      <span>
-        <i className="sw" style={{ background: COLORS.baseline }} /> Baseline
-      </span>
-      <span>
-        <i className="sw" style={{ background: COLORS.experiment }} /> Experiment
-      </span>
-      <span>
-        <i className="sw" style={{ background: COLORS.angle }} /> Site-to-plane angle
-      </span>
-      <span className="grow" />
-      <Popover label="More ▾" className="btn sm ghost" ariaLabel="More legend items">
+  const view = st.view.viewing && (
+    <>
+      <li>
+        <i className="sw" style={{ background: VIEW_COLOR }} /> Visible from the best spot
+      </li>
+      <li>
+        <i className="sw dot" style={{ background: VIEW_COLOR }} /> ◉ Best viewing spot · dashed = line of sight
+      </li>
+    </>
+  );
+  if (st.satellite.enabled)
+    return (
+      <>
         <ul className="key-list">
-          <li>
-            <i className="sw ring" /> Baseline site (ghost ring)
-          </li>
-          <li>
-            <i className="sw dash" /> Dashed: behind Earth / in-plane reference
-          </li>
-          <li>
-            <i className="sw dot" /> Satellite marker (orbital phase not modelled)
-          </li>
-          <li>
-            <span style={{ width: 22, textAlign: 'center', color: 'var(--text-2)' }}>▸</span> Direction of travel
-          </li>
+          <li><i className="sw dot" style={{ background: SAT_COLORS.object }} /> Cataloged object (estimated)</li>
+          <li><i className="sw" style={{ background: COLORS.baseline }} /> Baseline ascent</li>
+          <li><i className="sw" style={{ background: COLORS.experiment }} /> Experiment ascent</li>
+          <li><span className="key-glyph" style={{ color: SAT_COLORS.approach }}>◆</span> {LABELS.approach}</li>
+          <li><i className="sw dot" style={{ background: SAT_COLORS.selected }} /> ◎ Selected object</li>
+          <li><i className="sw dot" style={{ background: SAT_COLORS.synthetic }} /> Synthetic, fictional object</li>
+          <li><i className="sw dash" /> Trail (dashed = past)</li>
+          {view}
         </ul>
-        <div className="foot-note">Altitude ×3 · lighting &amp; frame illustrative</div>
-      </Popover>
-    </div>
+        <div className="foot-note">{LABELS.notToScale} · SGP4 estimates, not telemetry</div>
+      </>
+    );
+  return (
+    <>
+      <ul className="key-list">
+        <li><i className="sw" style={{ background: COLORS.baseline }} /> Baseline</li>
+        <li><i className="sw" style={{ background: COLORS.experiment }} /> Experiment</li>
+        <li><i className="sw" style={{ background: COLORS.angle }} /> Site-to-plane angle</li>
+        <li><i className="sw ring" /> Baseline site</li>
+        <li><i className="sw dash" /> Behind Earth</li>
+        <li><i className="sw dot" /> Satellite marker (phase not modelled)</li>
+        {view}
+      </ul>
+      <div className="foot-note">Altitude ×3 · not to scale · lighting illustrative</div>
+    </>
   );
 }
 
@@ -224,10 +179,7 @@ export function ComparisonView() {
 
   return (
     <section className="card stage" id="orbital-view" aria-label="Globe comparison">
-      <div className="section-heading">
-        <h2><span className="section-index">01</span> Orbital view</h2>
-        <span className="scene-hint">Drag to rotate <span>·</span> Scroll to zoom</span>
-      </div>
+      <h2 className="sr-only">Orbital view</h2>
       {tour && <GuidedBar />}
       <div className="stage-toolbar">
         <div className="seg" role="radiogroup" aria-label="View">
@@ -259,15 +211,30 @@ export function ComparisonView() {
               <IconPlane /> <span className="txt">Orbit plane</span>
             </button>
           )}
+          <Popover label={<IconLegend />} className="btn sm" ariaLabel="Legend" panelClass="legend-pop">
+            <LegendItems />
+          </Popover>
         </div>
+        <button
+          type="button"
+          className={`btn sm view-btn ${st.view.viewing ? 'on' : ''}`}
+          aria-pressed={st.view.viewing}
+          onClick={() => store.dispatch({ type: 'SET_VIEWING', on: !st.view.viewing })}
+          title="Best place to watch the launch, from its position and the weather"
+        >
+          <IconEye /> <span className="txt">Best view</span>
+        </button>
       </div>
       {st.satellite.enabled && <SatelliteToolbar />}
-      <div className={`panes n${panes.length}`}>
-        {(['baseline', 'experiment'] as ScenarioId[]).map((w) => (
-          <Pane key={w} which={w} active={panes.includes(w)} webgl={webgl} differs={differs} showScale={w === lastPane} />
-        ))}
+      <div className="panes-wrap">
+        <div className={`panes n${panes.length}`}>
+          {(['baseline', 'experiment'] as ScenarioId[]).map((w) => (
+            <Pane key={w} which={w} active={panes.includes(w)} webgl={webgl} differs={differs} showScale={w === lastPane} />
+          ))}
+        </div>
+        <PlaybackBar />
       </div>
-      <Legend />
+      <ResultStrip />
     </section>
   );
 }

@@ -8,8 +8,8 @@ import { siteInertial } from '@/simulation/coordinates';
 import { MAX_OFFSET_MINUTES, fmtOffset, offsetMinutes } from '@/simulation/scenario';
 import { fmtUtc } from '@/state/clock';
 import type { Action } from '@/state/reducer';
-import { liveClock, store, useInvestigation } from '@/state/store';
-import { IconGear, IconPause, IconPlay, IconReset, IconSkipBack, IconUndo } from './icons';
+import { store, useInvestigation } from '@/state/store';
+import { IconGear, IconReset, IconUndo } from './icons';
 import { COLORS } from './sceneColors';
 import { InfoTip, Popover, Switch, useTween } from './ui';
 
@@ -67,10 +67,17 @@ function ShiftSlider() {
           onChange={(e) => act({ type: 'SET_OFFSET', minutes: Number(e.target.value), relativeTo: 'baseline' })}
         />
       </div>
-      <div className="ticks" aria-hidden="true">
-        <span>−12 h</span>
-        <span style={{ color: COLORS.baseline }}>Baseline</span>
-        <span>+12 h</span>
+      <div className="ticks">
+        <span aria-hidden="true">−12 h</span>
+        <span className="tick-links" role="group" aria-label="Launch-time shortcuts">
+          <button type="button" className="tick-btn" style={{ color: COLORS.baseline }} aria-label="No delay (back to baseline time)" title="Back to the baseline time" onClick={() => act({ type: 'SET_OFFSET', minutes: 0, relativeTo: 'baseline' })} disabled={off === 0}>
+            Baseline
+          </button>
+          <button type="button" className="tick-btn" aria-label={`Jump to Window B (${fmtOffset(winB)})`} title={`Jump to Window B (${fmtOffset(winB)})`} onClick={() => act({ type: 'SET_OFFSET', minutes: winB, relativeTo: 'baseline' })}>
+            Window B ↗
+          </button>
+        </span>
+        <span aria-hidden="true">+12 h</span>
       </div>
     </div>
   );
@@ -87,15 +94,15 @@ export function TimelineControls() {
   const g2 = hl(v.highlight === 'plane' || v.highlight === 'orbit', 'o');
   const g3 = hl(v.highlight === 'site', 's');
   const siteChanged = st.experiment.launchSiteId !== st.baseline.launchSiteId;
-  const mm = String(Math.floor(v.playbackOffsetSec / 60)).padStart(2, '0');
-  const ss = String(Math.floor(v.playbackOffsetSec % 60)).padStart(2, '0');
 
   return (
     <section className="card dock deck" id="experiment-controls" aria-labelledby="controls-heading">
       <header className="deck-toolbar">
         <div className="deck-heading">
-          <h2 id="controls-heading">Experiment controls</h2>
-          <p>Change a variable. See the ripple.</p>
+          <h2 id="controls-heading">
+            <i className="led" style={{ ['--c' as string]: COLORS.experiment } as React.CSSProperties} /> Experiment
+          </h2>
+          <InfoTip label="About the experiment">Every control changes only the experiment copy. The baseline stays fixed, so the comparison is always against the original plan.</InfoTip>
         </div>
         <div className="history" role="group" aria-label="Experiment actions">
           <button type="button" className="btn sm ghost" onClick={() => act({ type: 'UNDO' })} disabled={!st.undoStack.length} title="Undo last change">
@@ -130,10 +137,6 @@ export function TimelineControls() {
           <span className="grow" />
           <span className="shift-value">{Math.round(shown) === 0 ? '0 h' : fmtOffset(Math.abs(shown - off) < 0.5 ? off : Math.round(shown))}</span>
         </div>
-        <div className="deck-sub">
-          {fmtUtc(st.experiment.launchTimeUtc)}
-          {off !== 0 ? <span className="tag">Hypothetical</span> : null}
-        </div>
         <ShiftSlider />
         <div className="shift-actions">
           <div className="steppers" role="group" aria-label="Shift steps">
@@ -141,10 +144,6 @@ export function TimelineControls() {
             <button type="button" className="btn sm mono" aria-label="Shift 15 minutes earlier" title="Shift 15 minutes earlier" disabled={off - 15 < -MAX_OFFSET_MINUTES} onClick={() => act({ type: 'SET_OFFSET', minutes: -15, relativeTo: 'experiment' })}>−15 m</button>
             <button type="button" className="btn sm mono" aria-label="Shift 15 minutes later" title="Shift 15 minutes later" disabled={off + 15 > MAX_OFFSET_MINUTES} onClick={() => act({ type: 'SET_OFFSET', minutes: 15, relativeTo: 'experiment' })}>+15 m</button>
             <button type="button" className="btn sm mono" aria-label="Shift 1 hour later" title="Shift 1 hour later" disabled={off + 60 > MAX_OFFSET_MINUTES} onClick={() => act({ type: 'SET_OFFSET', minutes: 60, relativeTo: 'experiment' })}>+1 h</button>
-          </div>
-          <div className="shift-shortcuts" role="group" aria-label="Launch-time shortcuts">
-            <button type="button" className="btn sm ghost" aria-label="No delay (back to baseline time)" title="Return to baseline launch time" onClick={() => act({ type: 'SET_OFFSET', minutes: 0, relativeTo: 'baseline' })} disabled={off === 0}>Baseline</button>
-            <button type="button" className="btn sm ghost" aria-label={`Jump to Window B (${fmtOffset(winB)})`} title={`Jump to Window B (${fmtOffset(winB)})`} onClick={() => act({ type: 'SET_OFFSET', minutes: winB, relativeTo: 'baseline' })}>Window B ↗</button>
           </div>
         </div>
       </div>
@@ -190,53 +189,6 @@ export function TimelineControls() {
         </div>
       </div>
 
-      {/* ---- Playback ---- */}
-      <div className="deck-col playback-col">
-        <div className="deck-head">
-          <span className="label plain">Playback</span>
-          <InfoTip label="About playback">Both globes share one playback offset, each measured from its own launch time. Numbers follow the displayed instant.</InfoTip>
-          <span className="grow" />
-          <span className="playback-time mono">
-            T+{mm}:{ss}
-          </span>
-        </div>
-        <div className="playback">
-          <button type="button" className={`btn playback-toggle ${v.playing ? 'on' : ''}`} aria-label={v.playing ? 'Pause' : 'Play'} title={v.playing ? 'Pause playback' : 'Play both scenarios'} aria-pressed={v.playing} onClick={() => store.dispatch({ type: 'SET_PLAYING', playing: !v.playing })}>
-            {v.playing ? <IconPause /> : <IconPlay />} {v.playing ? 'Pause' : 'Play'}
-          </button>
-          <button
-            type="button"
-            className="btn ghost icon"
-            aria-label="Back to T+0"
-            title="Back to T+0"
-            onClick={() => {
-              liveClock.playbackSec = 0;
-              store.dispatch({ type: 'SET_PLAYING', playing: false });
-              store.dispatch({ type: 'SET_PLAYBACK', seconds: 0 });
-            }}
-          >
-            <IconSkipBack />
-          </button>
-          <span className="playback-rate mono" title="Five simulated minutes per second">300× speed</span>
-        </div>
-        <div className="playback-timeline">
-          <input
-            type="range"
-            min={0}
-            max={3 * 3600}
-            step={30}
-            value={Math.round(v.playbackOffsetSec)}
-            aria-label="Playback position after launch"
-            aria-valuetext={`T plus ${mm} minutes ${ss} seconds`}
-            onChange={(e) => {
-              store.dispatch({ type: 'SET_PLAYING', playing: false });
-              store.dispatch({ type: 'SET_PLAYBACK', seconds: Number(e.target.value) });
-            }}
-          />
-          <div className="ticks playback-meta" aria-hidden="true"><span>Launch</span><span>+3 hours</span></div>
-        </div>
-        <p className="control-note">Both scenarios advance together from their own launch time.</p>
-      </div>
     </section>
   );
 }

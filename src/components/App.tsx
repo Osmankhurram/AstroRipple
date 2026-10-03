@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { buildDemoMission, LAUNCH_SITES } from '@/data/demoMission';
+import { buildDemoMission } from '@/data/demoMission';
 import { conversation } from '@/state/conversation';
 import { liveClock, store, useInvestigation } from '@/state/store';
 import { ComparisonView } from './ComparisonView';
@@ -10,9 +10,8 @@ import { IconHelp, IconReset } from './icons';
 import { InvestigationPanel } from './InvestigationPanel';
 import { LiveFeed } from './LiveFeed';
 import { MissionStrip } from './MissionStrip';
-import { ResultStrip } from './ResultStrip';
 import { TimelineControls } from './TimelineControls';
-import { InfoTip, Logo } from './ui';
+import { Logo } from './ui';
 import { ScreeningController } from './satellite/ScreeningController';
 import { ProximityPanel } from './satellite/ProximityPanel';
 import { TRAJECTORIES } from '@/satellites/ascent';
@@ -100,22 +99,13 @@ function ResetAll() {
 }
 
 function CommandBar() {
-  const st = useInvestigation();
-  const site = LAUNCH_SITES[st.mission.defaultSiteId];
   return (
     <header className="topbar">
       <div className="brand">
         <Logo />
         <span className="brand-name">AstroRipple<span className="brand-dot">.</span></span>
-        <InfoTip label="About the mission">
-          <strong>{st.mission.name}</strong> — {site.name}, {st.mission.vehicle.toLowerCase()}. Fictional demonstration data.
-        </InfoTip>
+        <span className="brand-tag">what-if launch lab</span>
       </div>
-      <nav className="topnav" aria-label="Main navigation">
-        <a href="#workspace">Explore</a>
-        <a href="#experiment-controls">Controls</a>
-        <a href="#live-feed">Launch feed</a>
-      </nav>
       <span className="spacer" />
       <div className="topbar-actions">
         <button type="button" className="btn ghost" onClick={openHowItWorks} title="How it works" aria-label="Guide: how it works">
@@ -146,23 +136,13 @@ export default function App() {
         Skip to Ask
       </a>
       <CommandBar />
-      <div className="workspace-heading" id="workspace">
-        <div>
-          <span className="eyebrow">ORBITAL EXPLORATION LAB</span>
-          <h1>One launch. Endless what-ifs.</h1>
-          <p>Shift the time. Change the orbit. See the ripple.</p>
-        </div>
-        <div className="mission-context">
-          <span className="mission-name"><i className="led" /> Detective-1 <span className="prov-tag">Demo mission</span></span>
-          <span>{LAUNCH_SITES[st.mission.defaultSiteId].shortName} <span aria-hidden="true">/</span> Educational simulation</span>
-        </div>
-      </div>
       <MissionStrip />
-      <main className="main">
-        <div className="left">
+      <main className="main" id="workspace">
+        {/* Flow: see (globe) → understand (readout / screening) → change (controls).
+            In Satellite Mode the screening panel is the primary result, so it sits right under the globe. */}
+        <div className={`left ${st.satellite.enabled ? 'sat' : ''}`}>
           <ComparisonView />
           {st.satellite.enabled && <ProximityPanel />}
-          <ResultStrip />
           <TimelineControls />
         </div>
         <aside className="side" aria-label="Investigation assistant">
@@ -171,7 +151,7 @@ export default function App() {
       </main>
       <LiveFeed />
       <footer className="footer">
-        <span>AstroRipple · Educational simulation with fictional demo data — not launch guidance</span>
+        <span>AstroRipple · educational simulation · not launch guidance</span>
         <button type="button" className="btn ghost sm" onClick={openHowItWorks}>
           How it works
         </button>
