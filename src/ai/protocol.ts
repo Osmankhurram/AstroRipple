@@ -11,7 +11,22 @@ import { z } from 'zod';
 import { LAUNCH_SITE_IDS, buildDemoMissionFromAnchor } from '../data/demoMission';
 import { ORBIT_PRESETS } from '../simulation/orbits';
 import { offsetMinutes } from '../simulation/scenario';
-import { initialState, reduceWithResult, type Action, type InvestigationState } from '../state/reducer';
+import { CATALOG_IDS, type CatalogId } from '../satellites/catalogs';
+import { SCREENING_LIMITS } from '../satellites/screening';
+import { SAT_KEY_RE, initialState, reduceWithResult, type Action, type InvestigationState } from '../state/reducer';
+
+export const SatelliteSnapshotSchema = z
+  .object({
+    enabled: z.boolean(),
+    timeSource: z.enum(['now', 'scenario']),
+    catalogId: z.enum(CATALOG_IDS as unknown as [string, ...string[]]),
+    /** Exact catalog snapshot the browser has loaded (null if none yet). */
+    snapshotId: z.string().max(160).nullable(),
+    selectedKey: z.string().regex(SAT_KEY_RE).nullable(),
+    thresholdKm: z.number().min(SCREENING_LIMITS.minThresholdKm).max(SCREENING_LIMITS.maxThresholdKm),
+    syncMode: z.enum(['elapsed', 'each-closest']),
+  })
+  .strict();
 
 export const SnapshotSchema = z
   .object({
@@ -24,6 +39,7 @@ export const SnapshotSchema = z
         orbitPreset: z.enum(ORBIT_PRESETS as unknown as [string, ...string[]]),
       })
       .strict(),
+    satellite: SatelliteSnapshotSchema.optional(),
   })
   .strict();
 
@@ -61,7 +77,8 @@ export interface InvestigateResponse {
   truncated?: boolean;
 }
 
-export function snapshotOf(state: InvestigationState): Snapshot {
+export function snapshotOf(state: InvestigationState, catalogSnapshotId: string | null = null): Snapshot {
+  const sat = state.satellite;
   return {
     revision: state.revision,
     missionAnchorUtc: state.mission.windows[0].startUtc,
@@ -69,6 +86,15 @@ export function snapshotOf(state: InvestigationState): Snapshot {
       offsetMinutes: offsetMinutes(state.experiment, state.baseline),
       launchSiteId: state.experiment.launchSiteId,
       orbitPreset: state.experiment.orbitPreset,
+    },
+    satellite: {
+      enabled: sat.enabled,
+      timeSource: sat.timeSource,
+      catalogId: sat.catalogId,
+      snapshotId: catalogSnapshotId,
+      selectedKey: sat.selectedKey,
+      thresholdKm: sat.thresholdKm,
+      syncMode: sat.syncMode,
     },
   };
 }
@@ -82,6 +108,17 @@ export function stateFromSnapshot(snap: Snapshot): { ok: true; state: Investigat
     { type: 'SET_LAUNCH_SITE', siteId: snap.experiment.launchSiteId },
     { type: 'SET_OFFSET', minutes: snap.experiment.offsetMinutes, relativeTo: 'baseline' },
   ];
+  const sat = snap.satellite;
+  if (sat) {
+    steps.push(
+      { type: 'SAT_SET_CATALOG', catalogId: sat.catalogId as CatalogId },
+      { type: 'SAT_SET_THRESHOLD', km: sat.thresholdKm },
+      { type: 'SAT_SET_SYNC', mode: sat.syncMode },
+      { type: 'SAT_SET_ENABLED', enabled: sat.enabled },
+      { type: 'SAT_SET_TIME_SOURCE', mode: sat.timeSource },
+      { type: 'SAT_SELECT', key: sat.selectedKey },
+    );
+  }
   for (const a of steps) {
     const r = reduceWithResult(s, a, 0);
     if (r.error) return { ok: false, error: r.error };

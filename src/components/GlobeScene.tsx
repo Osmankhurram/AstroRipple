@@ -13,6 +13,11 @@
  * Canonical values come from the store; per-frame displayed values interpolate toward them during
  * a ~1.2 s transition. All derived labels in the canvas are computed from the displayed geometry,
  * so labels and geometry always agree.
+ *
+ * Satellite Mode: Earth's rotation follows θ(t) ≈ GMST at the pane's instant (wall clock for "Now",
+ * launch epoch + elapsed for "Scenario"), and satellites/ascent are drawn in the Earth-fixed group in
+ * ECF km. The illustrative inertial target plane and its annotations are hidden (isolated), because
+ * the repeated Earth-fixed ascent does not claim to reach that unchanged plane after a delay.
  */
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Html, Line, OrbitControls, Stars } from '@react-three/drei';
@@ -42,6 +47,8 @@ import { TRANSITION_MS, type FocusTarget, type InvestigationState } from '@/stat
 import { cameraBus, liveClock, useInvestigation } from '@/state/store';
 import { planeMatrix, simToThree } from '@/render/frameAdapter';
 import { fallbackEarthTexture, loadEarthTexture } from '@/render/earthTexture';
+import { SatelliteLayer, type FocusBus } from './satellite/SatelliteLayer';
+import { paneInstantMs } from './satellite/paneTime';
 
 import { COLORS } from './sceneColors';
 export { COLORS };
@@ -66,15 +73,21 @@ interface Displayed {
 function targetValues(st: InvestigationState, which: ScenarioId, playbackSec: number): Displayed {
   const sc = which === 'baseline' ? st.baseline : st.experiment;
   const site = LAUNCH_SITES[sc.launchSiteId];
+  if (st.satellite.enabled) {
+    // Earth orientation at the pane's absolute instant (θ ≈ GMST), consistent with the ECF satellites.
+    const theta = mod2pi(earthRotationAngle(paneInstantMs(st, which, playbackSec, Date.now())));
+    return { theta, inc: sc.inclinationDeg, node: sc.ascendingNodeDeg, lat: site.latDeg, lon: site.lonDeg };
+  }
   const baseMs = Date.parse(st.baseline.launchTimeUtc);
   const thetaBase = mod2pi(earthRotationAngle(baseMs));
   const theta = thetaBase + OMEGA_EARTH * ((Date.parse(sc.launchTimeUtc) - baseMs) / 1000 + playbackSec);
   return { theta, inc: sc.inclinationDeg, node: sc.ascendingNodeDeg, lat: site.latDeg, lon: site.lonDeg };
 }
 
-function lerpDisplayed(a: Displayed, b: Displayed, k: number): Displayed {
+function lerpDisplayed(a: Displayed, b: Displayed, k: number, shortest = false): Displayed {
+  const dTheta = shortest ? Math.atan2(Math.sin(b.theta - a.theta), Math.cos(b.theta - a.theta)) : b.theta - a.theta;
   return {
-    theta: a.theta + (b.theta - a.theta) * k,
+    theta: a.theta + dTheta * k,
     inc: a.inc + (b.inc - a.inc) * k,
     node: a.node + wrap180(b.node - a.node) * k,
     lat: a.lat + (b.lat - a.lat) * k,
@@ -87,7 +100,17 @@ function sitePositionFixed(lat: number, lon: number, r = 1): THREE.Vector3 {
 }
 
 /** Camera goal for a focus target, computed from canonical geometry of the given scenario. */
-function cameraGoal(st: InvestigationState, focus: FocusTarget): { pos: THREE.Vector3; target: THREE.Vector3 } {
+function cameraGoal(st: InvestigationState, focus: FocusTarget, bus?: FocusBus | null): { pos: THREE.Vector3; target: THREE.Vector3 } {
+  const tracked = focus === 'satellite' ? bus?.selected : focus === 'encounter' ? bus?.rocket : null;
+  if (tracked) {
+    const up = tracked.clone().normalize();
+    const side = new THREE.Vector3().crossVectors(up, new THREE.Vector3(0, 1, 0)).normalize();
+    if (side.lengthSq() < 1e-6) side.set(1, 0, 0);
+    const dist = focus === 'satellite' ? 0.9 : 0.14;
+    const off = up.multiplyScalar(dist * 0.85).add(side.multiplyScalar(dist * 0.5));
+    return { pos: tracked.clone().add(off), target: tracked.clone() };
+  }
+  if (focus === 'satellite' || focus === 'encounter') focus = 'overview';
   const d = targetValues(st, 'experiment', liveClock.playbackSec);
   const r = rotateZ(surfaceVectorFixed(d.lat, d.lon), d.theta);
   const n = planeNormal(d.inc, d.node);
@@ -260,6 +283,11 @@ interface SceneProps {
 
 function SceneContents({ which, canvasId, showGhost, containerRef, overlayRef }: SceneProps) {
   const st = useInvestigation();
+  const satMode = st.satellite.enabled;
+  const focusBus = useRef<FocusBus>({ selected: null, rocket: null });
+  // Mounted on first use and then kept (its Html labels must not be unmounted mid-render).
+  const satEver = useRef(false);
+  if (satMode) satEver.current = true;
   const sc = which === 'baseline' ? st.baseline : st.experiment;
   const color = which === 'baseline' ? COLORS.baseline : COLORS.experiment;
   const radius = orbitRadius(sc.altitudeKm);
@@ -304,7 +332,7 @@ function SceneContents({ which, canvasId, showGhost, containerRef, overlayRef }:
       a.nonce = s.view.transitionNonce;
     }
     const k = a.dur > 0 ? Math.min(1, (now - a.start) / a.dur) : 1;
-    const d = k < 1 && a.from ? lerpDisplayed(a.from, tgt, ease(k)) : tgt;
+    const d = k < 1 && a.from ? lerpDisplayed(a.from, tgt, ease(k), s.satellite.enabled) : tgt;
     a.disp = d;
 
     // Highlight pulse (~1.6 s).
@@ -325,7 +353,9 @@ function SceneContents({ which, canvasId, showGhost, containerRef, overlayRef }:
       marker.current.position.copy(pos);
       marker.current.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), pos.clone().normalize());
       const ms = 1 + (p.target === 'site' ? pulseAmt * 0.9 : 0);
-      marker.current.scale.setScalar(ms);
+      // Satellite close-ups zoom to ~1,000 km: keep the site marker from swamping the view (not to scale anyway).
+      const near = s.satellite.enabled ? Math.min(1, camera.position.distanceTo(marker.current.getWorldPosition(new THREE.Vector3())) / 2.2) : 1;
+      marker.current.scale.setScalar(ms * near);
     }
 
     // Inertial target plane.
@@ -352,7 +382,7 @@ function SceneContents({ which, canvasId, showGhost, containerRef, overlayRef }:
       arcBuf[i * 3 + 1] = q.y;
       arcBuf[i * 3 + 2] = q.z;
     }
-    const visible = angle > 0.05;
+    const visible = angle > 0.05 && !s.satellite.enabled;
     if (arcRef.current) {
       arcRef.current.geometry.setPositions(arcBuf);
       arcRef.current.visible = visible;
@@ -373,7 +403,7 @@ function SceneContents({ which, canvasId, showGhost, containerRef, overlayRef }:
       // Label sits just outside the arc's midpoint; text comes from the displayed geometry.
       q.copy(rT).lerp(pT, 0.5).normalize().multiplyScalar(ANNOT_R + 0.12).project(camera);
       const onScreen = q.z < 1 && Math.abs(q.x) < 1.1 && Math.abs(q.y) < 1.1;
-      ov.style.display = onScreen ? 'block' : 'none';
+      ov.style.display = onScreen && !s.satellite.enabled ? 'block' : 'none';
       ov.style.transform = `translate(${((q.x * 0.5 + 0.5) * size.width).toFixed(1)}px, ${((-q.y * 0.5 + 0.5) * size.height).toFixed(1)}px) translate(-50%, -50%)`;
       ov.textContent = visible ? `∠ ${angle.toFixed(1)}°` : '∠ 0.0° · in plane';
       ov.classList.toggle('pulse-label', p.target === 'angle' && pulseAmt > 0.05);
@@ -400,7 +430,7 @@ function SceneContents({ which, canvasId, showGhost, containerRef, overlayRef }:
       )}
       {st.view.showAxis && <Line points={[[0, -1.45, 0], [0, 1.45, 0]]} color={COLORS.axis} lineWidth={1.2} dashed dashSize={0.05} gapSize={0.04} transparent opacity={0.55} />}
 
-      <group ref={planeGroup}>
+      <group ref={planeGroup} visible={!satMode}>
         <OrbitPlane color={color} radius={radius} highlightRef={planeHighlight} />
         <mesh ref={sat}>
           <sphereGeometry args={[0.032, 16, 12]} />
@@ -415,12 +445,12 @@ function SceneContents({ which, canvasId, showGhost, containerRef, overlayRef }:
 
       {/* Always mounted (toggling Html labels by mount/unmount is fragile); visibility toggled instead. */}
       {(
-        <group ref={ghost} visible={showGhost}>
+        <group ref={ghost} visible={showGhost && !satMode}>
           <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, 0.003, 0]}>
             <ringGeometry args={[0.03, 0.042, 32]} />
             <meshBasicMaterial color={COLORS.baseline} side={THREE.DoubleSide} transparent opacity={0.9} />
           </mesh>
-          <Html position={[0, -0.09, 0]} center zIndexRange={[20, 0]} style={{ pointerEvents: 'none', display: showGhost ? undefined : 'none' }}>
+          <Html position={[0, -0.09, 0]} center zIndexRange={[20, 0]} style={{ pointerEvents: 'none', display: showGhost && !satMode ? undefined : 'none' }}>
             <div className="scene-label ghost-label">Baseline site</div>
           </Html>
         </group>
@@ -429,6 +459,7 @@ function SceneContents({ which, canvasId, showGhost, containerRef, overlayRef }:
       {/* Earth-fixed frame. */}
       <group ref={earthGroup}>
         <Earth />
+        {satEver.current && <SatelliteLayer which={which} focusBus={focusBus} paneColor={color} enabled={satMode} />}
         <SiteMarker color={color} markerRef={marker}>
           {which === 'experiment' && (
             <SiteRipple trigger={st.revision} color={sameScenario(st.experiment, st.baseline) ? COLORS.baseline : COLORS.experiment} reduced={st.view.reducedMotion} />
@@ -437,7 +468,7 @@ function SceneContents({ which, canvasId, showGhost, containerRef, overlayRef }:
       </group>
       <Atmosphere />
 
-      <CameraRig canvasId={canvasId} containerRef={containerRef} />
+      <CameraRig canvasId={canvasId} containerRef={containerRef} focusBus={focusBus} />
     </>
   );
 }
@@ -452,7 +483,7 @@ function CameraLight() {
   return <directionalLight ref={light} intensity={1.6} />;
 }
 
-function CameraRig({ canvasId, containerRef }: { canvasId: string; containerRef: React.RefObject<HTMLDivElement | null> }) {
+function CameraRig({ canvasId, containerRef, focusBus }: { canvasId: string; containerRef: React.RefObject<HTMLDivElement | null>; focusBus: React.RefObject<FocusBus> }) {
   const st = useInvestigation();
   const stRef = useRef(st);
   stRef.current = st;
@@ -462,6 +493,7 @@ function CameraRig({ canvasId, containerRef }: { canvasId: string; containerRef:
   const userActive = useRef(0);
   const seen = useRef(cameraBus.version);
   const lastFocus = useRef(-1);
+  const lastTracked = useRef<THREE.Vector3 | null>(null);
 
   const publish = () => {
     if (!controls.current) return;
@@ -474,7 +506,8 @@ function CameraRig({ canvasId, containerRef }: { canvasId: string; containerRef:
 
   const goTo = (focus: FocusTarget, instant: boolean) => {
     if (!controls.current) return;
-    const g = cameraGoal(stRef.current, focus);
+    const g = cameraGoal(stRef.current, focus, focusBus.current);
+    lastTracked.current = null;
     if (instant) {
       camera.position.copy(g.pos);
       controls.current.target.copy(g.target);
@@ -545,23 +578,53 @@ function CameraRig({ canvasId, containerRef }: { canvasId: string; containerRef:
   useFrame(() => {
     const c = controls.current;
     if (!c) return;
+    const sv = stRef.current;
+    // Follow modes: track the selected object or the rocket (Earth-fixed objects move with the globe).
+    const followMode = sv.satellite.enabled
+      ? sv.view.focus === 'satellite' && sv.satellite.follow
+        ? 'satellite'
+        : sv.view.focus === 'encounter' && sv.satellite.focus
+          ? 'encounter'
+          : null
+      : null;
+    c.minDistance = followMode ? 0.02 : 1.6;
     const f = fly.current;
+    if (f && followMode) {
+      // Re-aim the fly-to at the moving point.
+      const g = cameraGoal(sv, followMode, focusBus.current);
+      f.toP.copy(g.pos);
+      f.toT.copy(g.target);
+    }
     if (f) {
       const k = Math.min(1, (performance.now() - f.start) / f.dur);
       const e = ease(k);
       // Arc around the globe rather than cutting through it.
       const p = f.fromP.clone().lerp(f.toP, e);
       const rad = THREE.MathUtils.lerp(f.fromP.length(), f.toP.length(), e);
-      p.setLength(Math.max(rad, 1.5));
+      p.setLength(Math.max(rad, followMode ? 1.0 : 1.5));
       camera.position.copy(p);
       c.target.copy(f.fromT.clone().lerp(f.toT, e));
       c.update();
       if (k >= 1) {
         fly.current = null;
-        publish(); // so canvases mounted later start from the same pose
+        if (!followMode) publish(); // so canvases mounted later start from the same pose
       }
       return;
     }
+    if (followMode) {
+      const tracked = followMode === 'satellite' ? focusBus.current?.selected : focusBus.current?.rocket;
+      if (tracked) {
+        if (lastTracked.current) {
+          const delta = tracked.clone().sub(lastTracked.current);
+          camera.position.add(delta);
+          c.target.add(delta);
+          c.update();
+        }
+        lastTracked.current = tracked.clone();
+      }
+      return; // panes follow their own object; camera sync is suspended while following
+    }
+    lastTracked.current = null;
     const s = stRef.current;
     if (s.view.syncCameras && cameraBus.version !== seen.current && cameraBus.source !== canvasId && performance.now() > userActive.current) {
       seen.current = cameraBus.version;
@@ -588,7 +651,9 @@ function CameraRig({ canvasId, containerRef }: { canvasId: string; containerRef:
         userActive.current = performance.now() + 700;
       }}
       onChange={() => {
-        if (performance.now() < userActive.current && stRef.current.view.syncCameras) publish();
+        const v = stRef.current.view;
+        const following = stRef.current.satellite.enabled && (v.focus === 'satellite' || v.focus === 'encounter');
+        if (performance.now() < userActive.current && v.syncCameras && !following) publish();
       }}
     />
   );
@@ -606,7 +671,13 @@ export function GlobeCanvas({ which, showGhost, label, active = true }: { which:
       role="application"
       aria-label={`${label} 3D globe. Drag to rotate, scroll to zoom. Keyboard: arrow keys rotate, plus and minus zoom, 0 resets the camera.`}
     >
-      <Canvas frameloop={active ? 'always' : 'never'} dpr={[1, 1.5]} camera={{ fov: 38, near: 0.05, far: 200, position: [0, 1, 4.5] }} gl={{ antialias: true, powerPreference: 'high-performance' }}>
+      <Canvas
+        frameloop={active ? 'always' : 'never'}
+        dpr={[1, 1.5]}
+        camera={{ fov: 38, near: 0.005, far: 200, position: [0, 1, 4.5] }}
+        gl={{ antialias: true, powerPreference: 'high-performance' }}
+        raycaster={{ params: { Points: { threshold: 0.015 } } as never }}
+      >
         <color attach="background" args={['#070b14']} />
         <SceneContents which={which} canvasId={canvasId} showGhost={showGhost} containerRef={containerRef} overlayRef={overlayRef} />
       </Canvas>

@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   description: 'An AI-guided, interactive 3D what-if explorer for launch timing, orbits, and weather. Educational simulation.',
 };
 
-export const viewport: Viewport = { width: 'device-width', initialScale: 1, themeColor: '#111724' };
+export const viewport: Viewport = { width: 'device-width', initialScale: 1, themeColor: '#090d12' };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

@@ -33,64 +33,66 @@ export function ResultStrip() {
   return (
     <section className={`card readout-card ${transitioning ? 'updating' : ''}`} aria-labelledby="ro-h" aria-busy={transitioning}>
       <header>
-        <h2 id="ro-h" className="label">
-          Readout
+        <h2 id="ro-h" className="label plain">
+          What changes
         </h2>
         <span className="ro-key" aria-hidden="true">
-          <span className="b">B</span>→<span className="e">E</span>
+          <span className="b">Baseline</span>→<span className="e">Experiment</span>
         </span>
         <ProvenanceDot p="computed" label="Readout" />
       </header>
 
-      <div className={`readout ${r1.className}`} key={r1.key} aria-hidden="true">
-        <span className="label">Shift</span>
-        <div className="big">
-          <span className="x">{e.offsetMinutes === 0 ? '0 h' : fmtOffset(e.offsetMinutes)}</span>
-          {e.offsetMinutes !== 0 && <span className="tag">Hypothetical</span>}
+      <div className="readout-grid">
+        <div className={`readout ${r1.className}`} key={r1.key} aria-hidden="true">
+          <span className="label">Shift</span>
+          <div className="big">
+            <span className="x">{e.offsetMinutes === 0 ? '0 h' : fmtOffset(e.offsetMinutes)}</span>
+            {e.offsetMinutes !== 0 && <span className="tag">Hypothetical</span>}
+          </div>
         </div>
-      </div>
 
-      <div className={`readout ${r2.className}`} key={r2.key}>
-        <div className="head">
-          <span className="label">Earth rotation</span>
-          <InfoTip label="About Earth rotation">How far Earth turns between the two launch times (sidereal rate 7.292115×10⁻⁵ rad/s, ≈15.04° per hour). This is not the site-to-plane angle.</InfoTip>
+        <div className={`readout ${r2.className}`} key={r2.key}>
+          <div className="head">
+            <span className="label">Earth rotation</span>
+            <InfoTip label="About Earth rotation">How far Earth turns between the two launch times (sidereal rate 7.292115×10⁻⁵ rad/s, ≈15.04° per hour). This is not the site-to-plane angle.</InfoTip>
+          </div>
+          <div className="big" aria-hidden="true">
+            {signed(rot)}°
+          </div>
         </div>
-        <div className="big" aria-hidden="true">
-          {signed(rot)}°
-        </div>
-      </div>
 
-      <div className={`readout angle ${r3.className}`} key={r3.key}>
-        <div className="head">
-          <span className="label">∠ Site-to-plane</span>
-          <InfoTip label="About the site-to-plane angle">{ANGLE_DISCLAIMER}</InfoTip>
+        <div className={`readout angle ${r3.className}`} key={r3.key}>
+          <div className="head">
+            <span className="label">∠ Site-to-plane</span>
+            <InfoTip label="About the site-to-plane angle">{ANGLE_DISCLAIMER}</InfoTip>
+          </div>
+          <div className="big" aria-hidden="true">
+            <span className="b">{b.siteToPlaneAngleDeg.toFixed(1)}°</span>
+            <span className="arrow">→</span>
+            <span className="e">{ang.toFixed(1)}°</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }} aria-hidden="true">
+            <span className="delta">Δ {signed(e.siteToPlaneAngleDeg - b.siteToPlaneAngleDeg)}°</span>
+            <span className="sub" title={p ? 'Each scene measured at the same time after its own launch' : 'At the launch instant'}>
+              at T+{p ? `${Math.floor(p / 60)}m` : '0'}
+            </span>
+          </div>
         </div>
-        <div className="big" aria-hidden="true">
-          <span className="b">{b.siteToPlaneAngleDeg.toFixed(1)}°</span>
-          <span className="arrow">→</span>
-          <span className="e">{ang.toFixed(1)}°</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }} aria-hidden="true">
-          <span className="delta">Δ {signed(e.siteToPlaneAngleDeg - b.siteToPlaneAngleDeg)}°</span>
-          <span className="sub" title={p ? 'Each scene measured at the same time after its own launch' : 'At the launch instant'}>
-            at T+{p ? `${Math.floor(p / 60)}m` : '0'}
-          </span>
-        </div>
-      </div>
 
-      <div className={`readout ${r4.className}`} key={r4.key}>
-        <div className="head">
-          <span className="label">Weather at launch</span>
-          <InfoTip label="About the weather indicator">Demo heuristic using teaching thresholds — not launch rules or a probability of approval.</InfoTip>
+        <div className={`readout ${r4.className}`} key={r4.key}>
+          <div className="head">
+            <span className="label">Weather at launch</span>
+            <InfoTip label="About the weather indicator">Demo heuristic using teaching thresholds — not launch rules or a probability of approval.</InfoTip>
+          </div>
+          <div className="big" aria-hidden="true">
+            <WeatherChip status={b.weatherStatus} small />
+            <span className="arrow">→</span>
+            <WeatherChip status={e.weatherStatus} small />
+            <span className="sub">{e.weatherStatus === b.weatherStatus ? 'same' : 'changed ◆'}</span>
+          </div>
         </div>
-        <div className="big" aria-hidden="true">
-          <WeatherChip status={b.weatherStatus} small />
-          <span className="arrow">→</span>
-          <WeatherChip status={e.weatherStatus} small />
-          <span className="sub">{e.weatherStatus === b.weatherStatus ? 'same' : 'changed ◆'}</span>
-        </div>
-      </div>
 
+      </div>
       <p className="sr-only" aria-live="polite">
         {transitioning
           ? 'Updating'

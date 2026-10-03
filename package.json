@@ -20,6 +20,7 @@
     "next": "^16.3.8",
     "react": "~19.3.0",
     "react-dom": "~19.3.0",
+    "satellite.js": "^7.1.0",
     "three": "^0.186.1",
     "topojson-client": "^3.1.0",
     "world-atlas": "^2.0.2",

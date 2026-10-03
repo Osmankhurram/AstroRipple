@@ -14,6 +14,9 @@ import { fmtOffset, offsetMinutes, type Scenario } from '../simulation/scenario'
 import { DEMO_THRESHOLDS, describeThresholds } from '../simulation/weather';
 import { reduceWithResult, type Action, type InvestigationState } from '../state/reducer';
 import { TOOL_INPUT_SCHEMAS, type ToolName } from './toolSchemas';
+import { SAT_TOOL_NAMES, planSatelliteTool, type SatToolName, type ToolContext } from './satelliteTools';
+
+export type { ToolContext };
 
 export const LIMITS = {
   frozenPlane:
@@ -110,7 +113,7 @@ function applyAll(state: InvestigationState, actions: Action[]): { ok: true; sta
   return { ok: true, state: s };
 }
 
-export function executeTool(state: InvestigationState, name: string, rawInput: unknown): ToolOutcome {
+export function executeTool(state: InvestigationState, name: string, rawInput: unknown, ctx?: ToolContext): ToolOutcome {
   if (!Object.prototype.hasOwnProperty.call(TOOL_INPUT_SCHEMAS, name)) return fail(name, state, `Unknown tool "${name}".`);
   const tool = name as ToolName;
   const parsed = TOOL_INPUT_SCHEMAS[tool].safeParse(rawInput ?? {});
@@ -118,6 +121,13 @@ export function executeTool(state: InvestigationState, name: string, rawInput: u
     return fail(name, state, `Invalid input: ${parsed.error.issues.map((i) => `${i.path.join('.') || '(root)'} ${i.message}`).join('; ')}`);
   }
   const input = parsed.data as Record<string, unknown>;
+  if ((SAT_TOOL_NAMES as string[]).includes(tool)) {
+    const o = planSatelliteTool(state, tool as SatToolName, input, ctx);
+    if (!o.ok) return fail(name, state, o.error ?? 'Tool failed.');
+    const r = applyAll(state, o.actions);
+    if (!r.ok) return fail(name, state, r.error);
+    return { ok: true, name, receipt: o.receipt, actions: o.actions, state: r.state, result: { tool, ok: true, facts: [], provenance: {}, limitations: [], ...o.result } as ToolResultPayload };
+  }
   const before = summarize(state, state.experiment);
   const baselineSummary = summarize(state, state.baseline);
 
@@ -129,7 +139,7 @@ export function executeTool(state: InvestigationState, name: string, rawInput: u
         { type: 'SET_OFFSET', minutes, relativeTo },
         { type: 'SET_VIEW_MODE', mode: 'compare' },
         { type: 'HIGHLIGHT', target: 'angle' },
-        { type: 'FOCUS', target: 'orbital-plane' },
+        { type: 'FOCUS', target: state.satellite.enabled ? 'overview' : 'orbital-plane' },
       ];
       const r = applyAll(state, actions);
       if (!r.ok) return fail(name, state, r.error);
@@ -350,5 +360,7 @@ export function executeTool(state: InvestigationState, name: string, rawInput: u
         },
       };
     }
+    default:
+      return fail(name, state, `Unhandled tool "${name}".`);
   }
 }

@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { LAUNCH_SITE_IDS } from '../data/demoMission';
 import { ORBIT_PRESETS } from '../simulation/orbits';
 import { MAX_OFFSET_MINUTES } from '../simulation/scenario';
+import { SAT_TOOL_DEFINITIONS, SAT_TOOL_INPUT_SCHEMAS } from './satelliteTools';
 
 export const SetLaunchOffsetInput = z
   .object({
@@ -36,6 +37,7 @@ export const TOOL_INPUT_SCHEMAS = {
   focus_scene: FocusSceneInput,
   reset_experiment: ResetExperimentInput,
   set_launch_site: SetLaunchSiteInput,
+  ...SAT_TOOL_INPUT_SCHEMAS,
 } as const;
 
 export type ToolName = keyof typeof TOOL_INPUT_SCHEMAS;
@@ -119,4 +121,5 @@ export const TOOL_DEFINITIONS = [
       additionalProperties: false,
     },
   },
+  ...SAT_TOOL_DEFINITIONS,
 ] as const;

@@ -13,6 +13,9 @@ import { MissionStrip } from './MissionStrip';
 import { ResultStrip } from './ResultStrip';
 import { TimelineControls } from './TimelineControls';
 import { InfoTip, Logo } from './ui';
+import { ScreeningController } from './satellite/ScreeningController';
+import { ProximityPanel } from './satellite/ProximityPanel';
+import { TRAJECTORIES } from '@/satellites/ascent';
 
 /** Advances the shared playback clock each frame; React gets a throttled copy (4 Hz). */
 function usePlaybackDriver() {
@@ -28,7 +31,17 @@ function usePlaybackDriver() {
     const loop = (t: number) => {
       const dt = Math.min(0.1, (t - last) / 1000);
       last = t;
+      const before = liveClock.playbackSec;
       liveClock.playbackSec = Math.min(3 * 3600, liveClock.playbackSec + dt * liveClock.speed);
+      // Satellite scenario replay: stop at the end of the ascent (nothing is modelled after it).
+      const s = store.get();
+      const end = TRAJECTORIES[s.satellite.trajectoryId]?.validitySeconds[1] ?? Infinity;
+      if (s.satellite.enabled && s.satellite.timeSource === 'scenario' && before < end && liveClock.playbackSec >= end) {
+        liveClock.playbackSec = end;
+        store.dispatch({ type: 'SET_PLAYBACK', seconds: end });
+        store.dispatch({ type: 'SET_PLAYING', playing: false });
+        return;
+      }
       if (t - lastCommit > 250) {
         lastCommit = t;
         store.dispatch({ type: 'SET_PLAYBACK', seconds: liveClock.playbackSec });
@@ -93,25 +106,23 @@ function CommandBar() {
     <header className="topbar">
       <div className="brand">
         <Logo />
-        <h1>AstroRipple</h1>
-        <span className="mission mono">
-          Detective-1 <span>· {site.shortName}</span>
-        </span>
+        <span className="brand-name">AstroRipple<span className="brand-dot">.</span></span>
         <InfoTip label="About the mission">
           <strong>{st.mission.name}</strong> — {site.name}, {st.mission.vehicle.toLowerCase()}. Fictional demonstration data.
         </InfoTip>
       </div>
+      <nav className="topnav" aria-label="Main navigation">
+        <a href="#workspace">Explore</a>
+        <a href="#experiment-controls">Controls</a>
+        <a href="#live-feed">Launch feed</a>
+      </nav>
       <span className="spacer" />
       <div className="topbar-actions">
-        <span className="edu-pill" tabIndex={0} title="Simplified, illustrative model using fictional demo data. Not operational launch guidance.">
-          <i className="led" style={{ ['--c' as string]: 'var(--signal)' } as React.CSSProperties} />
-          <span className="txt">Educational simulation</span>
-        </span>
-        <GuidedButton />
-        <button type="button" className="btn ghost" onClick={openHowItWorks} title="How it works" aria-label="How it works">
-          <IconHelp /> <span className="txt">How it works</span>
+        <button type="button" className="btn ghost" onClick={openHowItWorks} title="How it works" aria-label="Guide: how it works">
+          <IconHelp /> <span className="txt">Guide</span>
         </button>
         <ResetAll />
+        <GuidedButton />
       </div>
     </header>
   );
@@ -135,14 +146,26 @@ export default function App() {
         Skip to Ask
       </a>
       <CommandBar />
+      <div className="workspace-heading" id="workspace">
+        <div>
+          <span className="eyebrow">ORBITAL EXPLORATION LAB</span>
+          <h1>One launch. Endless what-ifs.</h1>
+          <p>Shift the time. Change the orbit. See the ripple.</p>
+        </div>
+        <div className="mission-context">
+          <span className="mission-name"><i className="led" /> Detective-1 <span className="prov-tag">Demo mission</span></span>
+          <span>{LAUNCH_SITES[st.mission.defaultSiteId].shortName} <span aria-hidden="true">/</span> Educational simulation</span>
+        </div>
+      </div>
       <MissionStrip />
       <main className="main">
         <div className="left">
           <ComparisonView />
+          {st.satellite.enabled && <ProximityPanel />}
+          <ResultStrip />
           <TimelineControls />
         </div>
-        <aside className="side" aria-label="Results and questions">
-          <ResultStrip />
+        <aside className="side" aria-label="Investigation assistant">
           <InvestigationPanel />
         </aside>
       </main>
@@ -155,6 +178,7 @@ export default function App() {
       </footer>
       <HowItWorks />
       <Toasts />
+      <ScreeningController />
     </div>
   );
 }

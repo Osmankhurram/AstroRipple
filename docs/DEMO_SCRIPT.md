@@ -17,3 +17,17 @@ needed (the panel shows "Scripted demo mode"). With a key, step 6 can be a live 
 
 Backup: if anything misbehaves, press **Exit**, then **Reset all**; all suggestions and controls work
 offline.
+
+## Satellite Mode add-on (≈ 60 s, offline-safe)
+
+| Time | Do | Say |
+|---|---|---|
+| 0:00 | Click **Satellite Mode**. Point at the *Now — estimated positions* clock and the *Source* tag. | "These are real cataloged space stations from CelesTrak, at SGP4-estimated positions — estimates, not live telemetry. The tag says whether the data is fresh, cached, or the bundled fixture." |
+| 0:10 | Search "ISS", select it, press **Follow**. | "Altitude, coordinates, and the element epoch: fetch time isn't element age." |
+| 0:20 | In the proximity panel click **▶ Synthetic encounter demo** → *Next*. | "Now a deliberately constructed, fictional example at a fixed demonstration time." |
+| 0:30 | Step 2 (slow replay). | "SYN-A passes 3 km from our illustrative ascent at T+400 s — because both are there at the same moment." |
+| 0:40 | Steps 3–4 (+10 min). | "Same Earth-fixed path ten minutes later: SYN-A is now 1,710 km away, but SYN-B comes within 12 km. Timing changes *which* objects are near; it doesn't make a launch safer in general." |
+| 0:50 | Steps 5–6. | "SYN-C crosses our path 120 s late — no encounter. SYN-D is over the same map spot but 300 km higher. A crossing on the globe is not a collision prediction — and nothing here is a collision probability." |
+
+Real-data follow-up: switch the screening set to *Active LEO sample (250)* and press **Analyze launch
+proximity** — real data may well show no approach within 25 km, which the panel states exactly.

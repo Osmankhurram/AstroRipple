@@ -8,8 +8,11 @@
  *  - Earth rotation angle: theta(t) = THETA_EPOCH + OMEGA_EARTH * (t - FRAME_EPOCH) [seconds].
  *  - r_inertial = Rz(theta(t)) * r_fixed.
  *
- * The frame's orientation relative to the stars is ILLUSTRATIVE. It is not GCRF/J2000 and does not
- * model sidereal time, precession, nutation, or polar motion.
+ * Orientation: θ(epoch) is the Greenwich Mean Sidereal Time at FRAME_EPOCH (satellite.js `gstime`,
+ * IAU-82), so θ(t) tracks GMST to within ~0.016° over 2026 and the frame is approximately the
+ * GMST-rotating frame used for TEME → Earth-fixed conversion. That keeps Earth's displayed rotation
+ * consistent with propagated satellites in Satellite Mode. It is still NOT GCRF/J2000: precession,
+ * nutation, polar motion, and UT1−UTC are not modelled.
  */
 
 export type Vec3 = readonly [number, number, number];
@@ -20,8 +23,8 @@ export const OMEGA_EARTH = 7.292115e-5;
 /** Fixed reference epoch of the demonstration frame. */
 export const FRAME_EPOCH_MS = Date.UTC(2026, 0, 1, 0, 0, 0);
 
-/** Earth rotation angle at FRAME_EPOCH (radians). Chosen as 0 — illustrative. */
-export const THETA_EPOCH = 0;
+/** Earth rotation angle at FRAME_EPOCH (radians) = GMST(2026-01-01T00:00:00Z) (tests check it against satellite.js). */
+export const THETA_EPOCH = 1.756863409365046;
 
 export const DEG = Math.PI / 180;
 export const RAD = 180 / Math.PI;

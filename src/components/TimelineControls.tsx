@@ -1,5 +1,5 @@
 'use client';
-/** Control deck: every manual twin of the AI actions, grouped into three columns. */
+/** Manual experiment controls, with shared utilities separated from the three task groups. */
 import { useMemo, useState } from 'react';
 import { LAUNCH_SITES } from '@/data/demoMission';
 import { alignmentCurve } from '@/simulation/metrics';
@@ -61,6 +61,7 @@ function ShiftSlider() {
           aria-valuetext={`${fmtOffset(off)} from baseline, hypothetical launch ${fmtUtc(st.experiment.launchTimeUtc)}`}
           onPointerDown={() => setDragging(true)}
           onPointerUp={() => setDragging(false)}
+          onPointerCancel={() => setDragging(false)}
           onFocus={() => setDragging(true)}
           onBlur={() => setDragging(false)}
           onChange={(e) => act({ type: 'SET_OFFSET', minutes: Number(e.target.value), relativeTo: 'baseline' })}
@@ -68,7 +69,7 @@ function ShiftSlider() {
       </div>
       <div className="ticks" aria-hidden="true">
         <span>−12 h</span>
-        <span style={{ color: COLORS.baseline }}>0</span>
+        <span style={{ color: COLORS.baseline }}>Baseline</span>
         <span>+12 h</span>
       </div>
     </div>
@@ -90,38 +91,69 @@ export function TimelineControls() {
   const ss = String(Math.floor(v.playbackOffsetSec % 60)).padStart(2, '0');
 
   return (
-    <section className="card dock deck" aria-label="Experiment controls">
+    <section className="card dock deck" id="experiment-controls" aria-labelledby="controls-heading">
+      <header className="deck-toolbar">
+        <div className="deck-heading">
+          <h2 id="controls-heading">Experiment controls</h2>
+          <p>Change a variable. See the ripple.</p>
+        </div>
+        <div className="history" role="group" aria-label="Experiment actions">
+          <button type="button" className="btn sm ghost" onClick={() => act({ type: 'UNDO' })} disabled={!st.undoStack.length} title="Undo last change">
+            <IconUndo /> Undo
+          </button>
+          <button type="button" className="btn sm ghost" onClick={() => act({ type: 'RESET_EXPERIMENT' })} disabled={st.revision === 0 && !st.undoStack.length} aria-label="Reset experiment to baseline" title="Reset experiment to baseline">
+            <IconReset /> Reset
+          </button>
+          <Popover
+            className="btn sm ghost"
+            ariaLabel="Display options"
+            label={<><IconGear /> Display</>}
+          >
+            <div className="display-options">
+              <span className="label plain">Scene preferences</span>
+              <Switch label="Axis" checked={v.showAxis} onChange={() => store.dispatch({ type: 'TOGGLE', key: 'showAxis' })} />
+              <Switch label="Equator" checked={v.showEquator} onChange={() => store.dispatch({ type: 'TOGGLE', key: 'showEquator' })} />
+              <Switch label="Sync cameras" checked={v.syncCameras} onChange={() => store.dispatch({ type: 'TOGGLE', key: 'syncCameras' })} />
+              <Switch label="Reduced motion" checked={v.reducedMotion} onChange={() => store.dispatch({ type: 'TOGGLE', key: 'reducedMotion' })} />
+            </div>
+          </Popover>
+        </div>
+      </header>
+
       {/* ---- Launch shift ---- */}
       <div className={`deck-col shift ${g1.className}`} key={g1.key}>
         <div className="deck-head">
-          <span className="label">Launch shift</span>
+          <label className="label plain" htmlFor="delay">Launch timing</label>
           <InfoTip label="About the launch shift">
             Moves the experiment’s hypothetical launch time (the real schedule never changes). Curve: site-to-plane angle at every shift — geometry only, not launch windows. Cyan tick: baseline. Dashed tick: supplied Window B.
           </InfoTip>
           <span className="grow" />
-          <span className="shift-value">{Math.round(shown) === 0 ? '0 h' : fmtOffset(Math.round(shown / 15) * 15)}</span>
+          <span className="shift-value">{Math.round(shown) === 0 ? '0 h' : fmtOffset(Math.abs(shown - off) < 0.5 ? off : Math.round(shown))}</span>
         </div>
         <div className="deck-sub">
           {fmtUtc(st.experiment.launchTimeUtc)}
           {off !== 0 ? <span className="tag">Hypothetical</span> : null}
         </div>
         <ShiftSlider />
-        <div className="steppers" role="group" aria-label="Shift steps">
-          <button type="button" className="btn sm mono" aria-label="Shift 1 hour earlier" title="Shift 1 hour earlier" onClick={() => act({ type: 'SET_OFFSET', minutes: -60, relativeTo: 'experiment' })}>−1h</button>
-          <button type="button" className="btn sm mono" aria-label="Shift 15 minutes earlier" title="Shift 15 minutes earlier" onClick={() => act({ type: 'SET_OFFSET', minutes: -15, relativeTo: 'experiment' })}>−15m</button>
-          <button type="button" className="btn sm mono" aria-label="Shift 15 minutes later" title="Shift 15 minutes later" onClick={() => act({ type: 'SET_OFFSET', minutes: 15, relativeTo: 'experiment' })}>+15m</button>
-          <button type="button" className="btn sm mono" aria-label="Shift 1 hour later" title="Shift 1 hour later" onClick={() => act({ type: 'SET_OFFSET', minutes: 60, relativeTo: 'experiment' })}>+1h</button>
-          <span className="grow" />
-          <button type="button" className="btn sm mono" aria-label="No delay (back to baseline time)" title="No delay" onClick={() => act({ type: 'SET_OFFSET', minutes: 0, relativeTo: 'baseline' })} disabled={off === 0}>0</button>
-          <button type="button" className="btn sm mono" aria-label={`Jump to Window B (${fmtOffset(winB)})`} title={`Jump to Window B (${fmtOffset(winB)})`} onClick={() => act({ type: 'SET_OFFSET', minutes: winB, relativeTo: 'baseline' })}>B</button>
+        <div className="shift-actions">
+          <div className="steppers" role="group" aria-label="Shift steps">
+            <button type="button" className="btn sm mono" aria-label="Shift 1 hour earlier" title="Shift 1 hour earlier" disabled={off - 60 < -MAX_OFFSET_MINUTES} onClick={() => act({ type: 'SET_OFFSET', minutes: -60, relativeTo: 'experiment' })}>−1 h</button>
+            <button type="button" className="btn sm mono" aria-label="Shift 15 minutes earlier" title="Shift 15 minutes earlier" disabled={off - 15 < -MAX_OFFSET_MINUTES} onClick={() => act({ type: 'SET_OFFSET', minutes: -15, relativeTo: 'experiment' })}>−15 m</button>
+            <button type="button" className="btn sm mono" aria-label="Shift 15 minutes later" title="Shift 15 minutes later" disabled={off + 15 > MAX_OFFSET_MINUTES} onClick={() => act({ type: 'SET_OFFSET', minutes: 15, relativeTo: 'experiment' })}>+15 m</button>
+            <button type="button" className="btn sm mono" aria-label="Shift 1 hour later" title="Shift 1 hour later" disabled={off + 60 > MAX_OFFSET_MINUTES} onClick={() => act({ type: 'SET_OFFSET', minutes: 60, relativeTo: 'experiment' })}>+1 h</button>
+          </div>
+          <div className="shift-shortcuts" role="group" aria-label="Launch-time shortcuts">
+            <button type="button" className="btn sm ghost" aria-label="No delay (back to baseline time)" title="Return to baseline launch time" onClick={() => act({ type: 'SET_OFFSET', minutes: 0, relativeTo: 'baseline' })} disabled={off === 0}>Baseline</button>
+            <button type="button" className="btn sm ghost" aria-label={`Jump to Window B (${fmtOffset(winB)})`} title={`Jump to Window B (${fmtOffset(winB)})`} onClick={() => act({ type: 'SET_OFFSET', minutes: winB, relativeTo: 'baseline' })}>Window B ↗</button>
+          </div>
         </div>
       </div>
 
       {/* ---- Orbit + site ---- */}
       <div className="deck-col">
-        <div className={g2.className} key={g2.key} style={{ display: 'grid', gap: 10, borderRadius: 10 }}>
+        <div className={`control-group ${g2.className}`} key={g2.key}>
           <div className="deck-head">
-            <span className="label" id="orbit-label">Orbit</span>
+            <span className="label plain" id="orbit-label">Target orbit</span>
             <InfoTip label="About orbit presets">LEO is an altitude range; polar and sun-synchronous describe other properties, so they overlap. Each plane is built to pass over the mission site at the baseline time, then held fixed. Inclination alone does not make an orbit sun-synchronous.</InfoTip>
           </div>
           <div className="orbit-keys" role="radiogroup" aria-labelledby="orbit-label">
@@ -142,9 +174,9 @@ export function TimelineControls() {
             ))}
           </div>
         </div>
-        <div className={g3.className} key={g3.key} style={{ display: 'grid', gap: 8, borderRadius: 10 }}>
+        <div className={`control-group ${g3.className}`} key={g3.key}>
           <div className="deck-head">
-            <label className="label" htmlFor="site">Site</label>
+            <label className="label plain" htmlFor="site">Launch site</label>
             <InfoTip label="About launch-site changes">Curated locations only. The target plane and baseline time stay fixed. A site change in the model does not mean the same rocket or mission could use that site.</InfoTip>
             {siteChanged && <i className="led" style={{ ['--c' as string]: COLORS.experiment } as React.CSSProperties} title="Differs from baseline" />}
           </div>
@@ -158,23 +190,23 @@ export function TimelineControls() {
         </div>
       </div>
 
-      {/* ---- Playback + history ---- */}
-      <div className="deck-col">
+      {/* ---- Playback ---- */}
+      <div className="deck-col playback-col">
         <div className="deck-head">
-          <span className="label">Playback</span>
+          <span className="label plain">Playback</span>
           <InfoTip label="About playback">Both globes share one playback offset, each measured from its own launch time. Numbers follow the displayed instant.</InfoTip>
           <span className="grow" />
-          <span className="mono" style={{ color: 'var(--text)', fontSize: 13 }}>
+          <span className="playback-time mono">
             T+{mm}:{ss}
           </span>
         </div>
         <div className="playback">
-          <button type="button" className={`btn icon ${v.playing ? 'on' : ''}`} aria-label={v.playing ? 'Pause' : 'Play'} title={v.playing ? 'Pause' : 'Play'} aria-pressed={v.playing} onClick={() => store.dispatch({ type: 'SET_PLAYING', playing: !v.playing })}>
-            {v.playing ? <IconPause /> : <IconPlay />}
+          <button type="button" className={`btn playback-toggle ${v.playing ? 'on' : ''}`} aria-label={v.playing ? 'Pause' : 'Play'} title={v.playing ? 'Pause playback' : 'Play both scenarios'} aria-pressed={v.playing} onClick={() => store.dispatch({ type: 'SET_PLAYING', playing: !v.playing })}>
+            {v.playing ? <IconPause /> : <IconPlay />} {v.playing ? 'Pause' : 'Play'}
           </button>
           <button
             type="button"
-            className="btn icon"
+            className="btn ghost icon"
             aria-label="Back to T+0"
             title="Back to T+0"
             onClick={() => {
@@ -185,6 +217,9 @@ export function TimelineControls() {
           >
             <IconSkipBack />
           </button>
+          <span className="playback-rate mono" title="Five simulated minutes per second">300× speed</span>
+        </div>
+        <div className="playback-timeline">
           <input
             type="range"
             min={0}
@@ -198,32 +233,9 @@ export function TimelineControls() {
               store.dispatch({ type: 'SET_PLAYBACK', seconds: Number(e.target.value) });
             }}
           />
+          <div className="ticks playback-meta" aria-hidden="true"><span>Launch</span><span>+3 hours</span></div>
         </div>
-        <div className="history">
-          <button type="button" className="btn sm" onClick={() => act({ type: 'UNDO' })} disabled={!st.undoStack.length} title="Undo last change">
-            <IconUndo /> Undo
-          </button>
-          <button type="button" className="btn sm" onClick={() => act({ type: 'RESET_EXPERIMENT' })} disabled={st.revision === 0 && !st.undoStack.length} aria-label="Reset experiment to baseline" title="Reset experiment to baseline">
-            <IconReset /> Reset
-          </button>
-          <span className="grow" />
-          <Popover
-            className="btn sm"
-            ariaLabel="Display options"
-            label={
-              <>
-                <IconGear /> Display
-              </>
-            }
-          >
-            <div style={{ display: 'grid', gap: 4, minWidth: 210 }}>
-              <Switch label="Axis" checked={v.showAxis} onChange={() => store.dispatch({ type: 'TOGGLE', key: 'showAxis' })} />
-              <Switch label="Equator" checked={v.showEquator} onChange={() => store.dispatch({ type: 'TOGGLE', key: 'showEquator' })} />
-              <Switch label="Sync cameras" checked={v.syncCameras} onChange={() => store.dispatch({ type: 'TOGGLE', key: 'syncCameras' })} />
-              <Switch label="Reduced motion" checked={v.reducedMotion} onChange={() => store.dispatch({ type: 'TOGGLE', key: 'reducedMotion' })} />
-            </div>
-          </Popover>
-        </div>
+        <p className="control-note">Both scenarios advance together from their own launch time.</p>
       </div>
     </section>
   );

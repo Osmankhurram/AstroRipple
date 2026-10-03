@@ -51,19 +51,20 @@ export function LiveFeed() {
   };
 
   return (
-    <section className="card livefeed" aria-label="Real-world launches">
+    <section className="card livefeed" id="live-feed" aria-label="Real-world launches">
       <div className="livefeed-head">
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
-          <span className="label">Real-world launches</span>
+          <span className="label plain">Beyond the simulation</span>
           <InfoTip label="About the real-world feed">Optional and separate from the demo mission: upcoming launches from Launch Library 2 and the current Open-Meteo forecast for the Florida coast. Cached on the server.</InfoTip>
           {data?.enabled && data.launches ? <ProvenanceDot p={data.launches.provenance} label="Schedule" /> : null}
         </span>
         {!data && (
           <button type="button" className="btn sm" onClick={load} disabled={state === 'loading'}>
-            {state === 'loading' ? 'Loading…' : 'Load ›'}
+            {state === 'loading' ? 'Loading…' : 'Load real-world launches ↗'}
           </button>
         )}
       </div>
+      {!data && <p className="livefeed-description">Explore upcoming launches and weather from the real-world feed.</p>}
       {state === 'error' && <p className="muted small">■ Could not reach the server. The demo is unaffected.</p>}
       {data && !data.enabled && (
         <p className="muted small" title="Set LD_ENABLE_LIVE_DATA=1 to enable. The demo mission always uses local fixtures.">
