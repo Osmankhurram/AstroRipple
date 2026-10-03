@@ -1,28 +1,69 @@
 'use client';
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import type { Provenance } from '@/simulation/weather';
 
-export function ProvenanceBadge({ p, label }: { p: Provenance | 'computed' | 'scripted'; label?: string }) {
-  const text: Record<string, string> = {
-    live: 'Live',
-    cached: 'Cached',
-    demo: 'Demo data',
-    unavailable: 'Unavailable',
-    computed: 'Computed (illustrative)',
-    scripted: 'Scripted',
-  };
+const PROV_TEXT: Record<string, string> = {
+  live: 'Live data',
+  cached: 'Cached data',
+  demo: 'Demo data (fictional)',
+  unavailable: 'Unavailable',
+  computed: 'Computed (illustrative model)',
+  scripted: 'Scripted',
+};
+const PROV_TAG: Record<string, string> = { live: 'Live', cached: 'Cached', demo: 'Demo', unavailable: 'N/A', computed: 'Computed', scripted: 'Scripted' };
+
+/** Visible provenance tag (DEMO / LIVE / CACHED / COMPUTED / N/A); full wording on hover/focus. */
+export function ProvenanceDot({ p, label }: { p: Provenance | 'computed'; label: string }) {
+  const text = `${label}: ${PROV_TEXT[p]}`;
   return (
-    <span className={`prov prov-${p}`} title={label ? `${label}: ${text[p]}` : text[p]}>
-      {label ? <span className="prov-k">{label}</span> : null}
-      {text[p]}
+    <span className={`prov-tag ${p}`} role="note" aria-label={text} title={text} tabIndex={0}>
+      {PROV_TAG[p]}
     </span>
   );
 }
 
-/** Accessible info tooltip: focusable button; content shown on hover/focus and announced. */
+/** Text badge variant (used in the About sheet legend and the real-data feed). */
+export function ProvenanceBadge({ p, label }: { p: Provenance | 'computed' | 'scripted'; label?: string }) {
+  return (
+    <span className={`prov-tag ${p}`} title={PROV_TEXT[p]}>
+      {label ? `${label} · ` : ''}
+      {PROV_TAG[p]}
+    </span>
+  );
+}
+
+/** Closes on outside pointer-down or Escape; returns focus to the trigger on Escape. */
+export function useDismiss(open: boolean, close: () => void, ref: React.RefObject<HTMLElement | null>, trigger?: React.RefObject<HTMLElement | null>) {
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: PointerEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) close();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        close();
+        trigger?.current?.focus();
+      }
+    };
+    document.addEventListener('pointerdown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open, close, ref, trigger]);
+}
+
+/** Accessible info tooltip: focusable button; content shown on hover/focus/click; Escape closes. */
 export function InfoTip({ children, label = 'More info' }: { children: React.ReactNode; label?: string }) {
   const id = useId();
   const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open]);
   return (
     <span className="infotip" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
       <button
@@ -41,6 +82,51 @@ export function InfoTip({ children, label = 'More info' }: { children: React.Rea
         {children}
       </span>
     </span>
+  );
+}
+
+/** Button + anchored popover panel. */
+export function Popover({
+  label,
+  children,
+  className = 'btn sm',
+  align = 'right',
+  ariaLabel,
+  panelClass = '',
+}: {
+  label: React.ReactNode;
+  children: React.ReactNode | ((close: () => void) => React.ReactNode);
+  className?: string;
+  align?: 'left' | 'right';
+  ariaLabel?: string;
+  panelClass?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const wrap = useRef<HTMLSpanElement>(null);
+  const btn = useRef<HTMLButtonElement>(null);
+  const id = useId();
+  const close = () => setOpen(false);
+  useDismiss(open, close, wrap, btn);
+  return (
+    <span className="pop-anchor" ref={wrap}>
+      <button ref={btn} type="button" className={className} aria-expanded={open} aria-controls={id} aria-label={ariaLabel} onClick={() => setOpen((o) => !o)}>
+        {label}
+      </button>
+      {open && (
+        <div id={id} className={`popover ${align === 'left' ? 'left' : ''} ${panelClass}`}>
+          {typeof children === 'function' ? children(close) : children}
+        </div>
+      )}
+    </span>
+  );
+}
+
+export function Switch({ checked, onChange, label }: { checked: boolean; onChange: () => void; label: string }) {
+  return (
+    <label className="switch-row">
+      <span>{label}</span>
+      <button type="button" role="switch" aria-checked={checked} className="switch" onClick={onChange} aria-label={label} />
+    </label>
   );
 }
 
@@ -66,4 +152,42 @@ export function useTransitioning(until: number): boolean {
     return () => clearTimeout(t);
   }, [active, until]);
   return active;
+}
+
+/** Animate a number toward `value` (easeOutCubic). Snaps instantly when disabled. */
+export function useTween(value: number, enabled: boolean, ms = 650): number {
+  const [shown, setShown] = useState(value);
+  const from = useRef(value);
+  const shownRef = useRef(value);
+  shownRef.current = shown;
+  useEffect(() => {
+    if (!enabled || !Number.isFinite(value)) {
+      setShown(value);
+      return;
+    }
+    from.current = shownRef.current;
+    const start = performance.now();
+    let raf = 0;
+    const tick = (t: number) => {
+      const k = Math.min(1, (t - start) / ms);
+      const e = 1 - Math.pow(1 - k, 3);
+      setShown(from.current + (value - from.current) * e);
+      if (k < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [value, enabled, ms]);
+  return shown;
+}
+
+/** The AstroRipple mark: concentric ripple rings around a dot. */
+export function Logo({ size = 28 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden="true">
+      <circle cx="16" cy="16" r="3.2" fill="#e8edf5" />
+      <circle cx="16" cy="16" r="8" fill="none" stroke="#e8edf5" strokeOpacity="0.7" strokeWidth="1.4" />
+      <circle cx="16" cy="16" r="13" fill="none" stroke="#e8edf5" strokeOpacity="0.32" strokeWidth="1.2" />
+      <ellipse cx="16" cy="16" rx="14.5" ry="5" fill="none" stroke="#c4a7ff" strokeWidth="1.3" transform="rotate(-28 16 16)" />
+    </svg>
+  );
 }

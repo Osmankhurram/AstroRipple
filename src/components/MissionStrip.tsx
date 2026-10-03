@@ -1,11 +1,18 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
-import { LAUNCH_SITES } from '@/data/demoMission';
+/**
+ * Status rail: one recessed instrument well with the wall-clock countdown and the two supplied
+ * windows (each with its weather light). Details live in popovers.
+ */
+import { useEffect, useState } from 'react';
+import type { LaunchWindow } from '@/data/demoMission';
 import { computeMetrics } from '@/simulation/metrics';
 import { countdown, fmtUtc, formatCountdown } from '@/state/clock';
 import { store, useInvestigation } from '@/state/store';
-import { InfoTip, ProvenanceBadge } from './ui';
-import { ThresholdHelp, WeatherChip, WeatherDetails } from './WeatherIndicator';
+import { InfoTip, Popover, ProvenanceDot } from './ui';
+import { ThresholdHelp, WeatherDetails } from './WeatherIndicator';
+
+const ICON = { green: '●', yellow: '▲', red: '■', unknown: '?' } as const;
+const LABEL = { green: 'Green', yellow: 'Yellow', red: 'Red', unknown: 'Unknown' } as const;
 
 /** Wall-clock countdown: independent of the hypothetical experiment and of playback. */
 function Countdown() {
@@ -17,125 +24,113 @@ function Countdown() {
   }, []);
   const c = countdown(st.mission, now);
   return (
-    <div className="countdown" aria-live="off">
-      <div className="label-row">
-        <span className="eyebrow">Countdown to next supplied window</span>
-        <ProvenanceBadge p={st.mission.scheduleProvenance} label="Schedule" />
+    <div className="rail-cell count">
+      <div className="row">
+        <span className="label">Next window</span>
+        <ProvenanceDot p={st.mission.scheduleProvenance} label="Schedule" />
+        <InfoTip label="About the countdown">Counts down on your clock to the next supplied window. What-if experiments never change this schedule.</InfoTip>
       </div>
       {c.state === 'upcoming' && (
         <>
-          <div className="countdown-value tabular" aria-label={`Window ${c.window!.id} opens in ${formatCountdown(c.msRemaining)}`}>
+          <div className="countdown-digits" role="timer" aria-label={`Window ${c.window!.id} opens in ${formatCountdown(c.msRemaining)}`}>
             T−{formatCountdown(c.msRemaining)}
           </div>
-          <div className="muted small">
-            {c.window!.label} opens {fmtUtc(c.window!.startUtc)}
-          </div>
+          <span className="window-date">
+            Window {c.window!.id} · {fmtUtc(c.window!.startUtc)}
+          </span>
         </>
       )}
       {c.state === 'open' && (
         <>
-          <div className="countdown-value tabular open">Window {c.window!.id} open</div>
-          <div className="muted small">Closes in {formatCountdown(c.msRemaining)}</div>
+          <div className="countdown-digits open">Window {c.window!.id} open</div>
+          <span className="window-date">Closes in {formatCountdown(c.msRemaining)}</span>
         </>
       )}
       {c.state === 'tentative' && (
         <>
-          <div className="countdown-value">Tentative: {fmtUtc(c.window!.startUtc).split(' ').slice(0, 2).join(' ')}</div>
-          <div className="muted small">Date not confirmed — no exact countdown shown.</div>
+          <div className="countdown-digits soft">{fmtUtc(c.window!.startUtc).split(' ').slice(0, 2).join(' ')}</div>
+          <span className="window-date">Tentative — no exact countdown</span>
         </>
       )}
-      {c.state === 'none' && <div className="countdown-value">No next supplied window</div>}
-      <div className="muted tiny">What-if delays never change this schedule.</div>
+      {c.state === 'none' && <div className="countdown-digits soft">No next window</div>}
+    </div>
+  );
+}
+
+function WindowCell({ w, className }: { w: LaunchWindow; className: string }) {
+  const st = useInvestigation();
+  const m = computeMetrics({ ...st.baseline, launchTimeUtc: w.startUtc }, st.baseline, st.mission);
+  const hl = st.view.highlight === 'weather' || st.view.highlight === 'windows';
+  const d = new Date(w.startUtc);
+  const pad = (x: number) => String(x).padStart(2, '0');
+  return (
+    <div className={`rail-cell ${className} ${hl ? 'pulse' : ''}`} key={hl ? `hl-${st.view.highlightNonce}` : 'idle'}>
+      <div className="row">
+        <span className="label">
+          Window {w.id}
+          {w.id === 'A' ? <span className="win-primary"> · primary</span> : ''}
+        </span>
+        {w.id === 'A' && (
+          <InfoTip label="About the windows">Two fictional windows supplied with the mission. AstroRipple compares them; it never invents new ones.</InfoTip>
+        )}
+      </div>
+      <div className="row">
+        <span className="window-time">
+          {pad(d.getUTCHours())}:{pad(d.getUTCMinutes())}{' '}
+          <span className="window-date">UTC · {fmtUtc(w.startUtc).split(' ').slice(0, 2).join(' ')}</span>
+        </span>
+      </div>
+      <div className="row">
+        <Popover
+          align={w.id === 'B' ? 'right' : 'left'}
+          className="btn sm ghost why-btn"
+          ariaLabel={`Weather ${LABEL[m.weatherStatus]} for window ${w.id}. Show why.`}
+          label={
+            <>
+              <span className={`wx-chip wx-${m.weatherStatus}`}>
+                <span className="glyph" aria-hidden="true">
+                  {ICON[m.weatherStatus]}
+                </span>
+                {LABEL[m.weatherStatus]}
+              </span>
+              <span>Why ›</span>
+            </>
+          }
+        >
+          {(close) => (
+            <div style={{ display: 'grid', gap: 12 }}>
+              <WeatherDetails w={m.weather} title={`Window ${w.id} weather`} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                  <span className="label plain">Thresholds</span>
+                  <ThresholdHelp />
+                </span>
+                <button
+                  type="button"
+                  className="btn sm"
+                  onClick={() => {
+                    store.dispatch({ type: 'FOCUS', target: 'launch-site' });
+                    close();
+                  }}
+                >
+                  ⌖ Show site
+                </button>
+              </div>
+            </div>
+          )}
+        </Popover>
+      </div>
     </div>
   );
 }
 
 export function MissionStrip() {
   const st = useInvestigation();
-  const site = LAUNCH_SITES[st.mission.defaultSiteId];
-  const baseM = computeMetrics(st.baseline, st.baseline, st.mission);
-  const hl = st.view.highlight === 'weather' || st.view.highlight === 'windows' || st.view.focus === 'weather';
-  const [open, setOpen] = useState(false);
-  const wxRef = useRef<HTMLDivElement>(null);
-  // The evidence popover closes on outside click or Escape so it never blocks other controls.
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      if (wxRef.current && !wxRef.current.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [open]);
-
   return (
-    <section className="mission-strip" aria-label="Mission summary">
-      <div className="ms-block">
-        <span className="eyebrow">Mission</span>
-        <div className="ms-title">{st.mission.name}</div>
-        <div className="muted small">
-          {site.name} · {st.mission.vehicle}
-        </div>
-      </div>
-
-      <div className={`ms-block windows ${st.view.highlight === 'windows' ? 'pulse' : ''}`}>
-        <div className="label-row">
-          <span className="eyebrow">Supplied launch windows</span>
-          <InfoTip label="About the windows">
-            Two fictional demonstration windows. The app compares them; it never creates new launch windows.
-          </InfoTip>
-        </div>
-        <ul className="window-list">
-          {st.mission.windows.map((w) => {
-            const m = computeMetrics(
-              { ...st.baseline, launchTimeUtc: w.startUtc },
-              st.baseline,
-              st.mission,
-            );
-            return (
-              <li key={w.id}>
-                <span className="win-id">{w.id}</span>
-                <span className="tabular">{fmtUtc(w.startUtc)}</span>
-                <WeatherChip status={m.weatherStatus} small />
-              </li>
-            );
-          })}
-        </ul>
-      </div>
-
+    <section className="rail" aria-label="Launch status">
       <Countdown />
-
-      <div className={`ms-block weather ${hl ? 'pulse' : ''}`} id="weather-panel" ref={wxRef}>
-        <div className="label-row">
-          <span className="eyebrow">Weather impact · Window A</span>
-          <ThresholdHelp />
-        </div>
-        <div className="wx-summary">
-          <WeatherChip status={baseM.weatherStatus} />
-          <button type="button" className="link-btn" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
-            {open ? 'Hide inputs' : 'Why?'}
-          </button>
-          <ProvenanceBadge p={st.mission.weatherProvenance} label="Weather" />
-        </div>
-        {open && (
-          <div className="wx-pop" role="dialog" aria-label="Weather evidence">
-            <button type="button" className="wx-close" aria-label="Close weather details" onClick={() => setOpen(false)}>
-              ×
-            </button>
-            <WeatherDetails w={baseM.weather} title="Baseline (Window A)" />
-            {(st.experiment.launchTimeUtc !== st.baseline.launchTimeUtc || st.experiment.launchSiteId !== st.baseline.launchSiteId) ? (
-              <WeatherDetails w={computeMetrics(st.experiment, st.baseline, st.mission).weather} title="Experiment" />
-            ) : null}
-            <button type="button" className="link-btn" onClick={() => store.dispatch({ type: 'FOCUS', target: 'launch-site' })}>
-              Show the launch site on the globe
-            </button>
-          </div>
-        )}
-      </div>
+      <WindowCell w={st.mission.windows[0]} className="win-a" />
+      <WindowCell w={st.mission.windows[1]} className="win-b" />
     </section>
   );
 }

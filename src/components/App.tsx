@@ -1,17 +1,18 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { buildDemoMission } from '@/data/demoMission';
+import { buildDemoMission, LAUNCH_SITES } from '@/data/demoMission';
 import { conversation } from '@/state/conversation';
 import { liveClock, store, useInvestigation } from '@/state/store';
 import { ComparisonView } from './ComparisonView';
-import { GuidedBar, GuidedButton } from './GuidedDemo';
-import { HowItWorks } from './HowItWorks';
+import { GuidedButton } from './GuidedDemo';
+import { HowItWorks, openHowItWorks } from './HowItWorks';
+import { IconHelp, IconReset } from './icons';
 import { InvestigationPanel } from './InvestigationPanel';
 import { LiveFeed } from './LiveFeed';
 import { MissionStrip } from './MissionStrip';
 import { ResultStrip } from './ResultStrip';
 import { TimelineControls } from './TimelineControls';
-import { ProvenanceBadge } from './ui';
+import { InfoTip, Logo } from './ui';
 
 /** Advances the shared playback clock each frame; React gets a throttled copy (4 Hz). */
 function usePlaybackDriver() {
@@ -52,8 +53,8 @@ function Toasts() {
       clearTimeout(t);
       t = setTimeout(() => setMsg(null), 4500);
     };
-    window.addEventListener('ld-toast', on);
-    return () => window.removeEventListener('ld-toast', on);
+    window.addEventListener('ar-toast', on);
+    return () => window.removeEventListener('ar-toast', on);
   }, []);
   return msg ? (
     <div className="toast" role="status">
@@ -62,49 +63,55 @@ function Toasts() {
   ) : null;
 }
 
-function TopBar() {
+function ResetAll() {
+  const [confirm, setConfirm] = useState(false);
+  return (
+    <button
+      type="button"
+      className={`btn ${confirm ? 'on' : 'ghost'}`}
+      onClick={() => {
+        if (!confirm) {
+          setConfirm(true);
+          setTimeout(() => setConfirm(false), 3000);
+          return;
+        }
+        setConfirm(false);
+        store.dispatch({ type: 'NEW_MISSION', mission: buildDemoMission(Date.now()) });
+        conversation.clear();
+      }}
+      title="Start over: new baseline, clears comparison, history and conversation"
+    >
+      <IconReset /> <span className="txt">{confirm ? 'Confirm reset?' : 'Reset all'}</span>
+    </button>
+  );
+}
+
+function CommandBar() {
   const st = useInvestigation();
-  const [confirmNew, setConfirmNew] = useState(false);
+  const site = LAUNCH_SITES[st.mission.defaultSiteId];
   return (
     <header className="topbar">
       <div className="brand">
-        <span className="logo" aria-hidden="true">◎</span>
-        <h1>Launch Detective</h1>
-        <span className="tagline">Ask why about a rocket launch — and see the answer happen.</span>
+        <Logo />
+        <h1>AstroRipple</h1>
+        <span className="mission mono">
+          Detective-1 <span>· {site.shortName}</span>
+        </span>
+        <InfoTip label="About the mission">
+          <strong>{st.mission.name}</strong> — {site.name}, {st.mission.vehicle.toLowerCase()}. Fictional demonstration data.
+        </InfoTip>
       </div>
-      <div className="topbar-right">
-        <label className="mission-select">
-          <span className="sr-only">Mission</span>
-          <select
-            value={st.mission.id}
-            onChange={() => {
-              /* single demo mission; selector kept for structure */
-            }}
-          >
-            <option value={st.mission.id}>{st.mission.name}</option>
-          </select>
-        </label>
-        <span className="status-badges">
-          <ProvenanceBadge p="demo" label="Data" />
-          <span className="edu-badge" title="Simplified, illustrative model. See “How this works”.">Educational simulation</span>
+      <span className="spacer" />
+      <div className="topbar-actions">
+        <span className="edu-pill" tabIndex={0} title="Simplified, illustrative model using fictional demo data. Not operational launch guidance.">
+          <i className="led" style={{ ['--c' as string]: 'var(--signal)' } as React.CSSProperties} />
+          <span className="txt">Educational simulation</span>
         </span>
         <GuidedButton />
-        <button
-          type="button"
-          onClick={() => {
-            if (!confirmNew) {
-              setConfirmNew(true);
-              setTimeout(() => setConfirmNew(false), 3000);
-              return;
-            }
-            setConfirmNew(false);
-            store.dispatch({ type: 'NEW_MISSION', mission: buildDemoMission(Date.now()) });
-            conversation.clear();
-          }}
-          title="Start a fresh investigation: new baseline, clears comparison, history and conversation."
-        >
-          {confirmNew ? 'Confirm reset?' : 'Reset all'}
+        <button type="button" className="btn ghost" onClick={openHowItWorks} title="How it works" aria-label="How it works">
+          <IconHelp /> <span className="txt">How it works</span>
         </button>
+        <ResetAll />
       </div>
     </header>
   );
@@ -112,31 +119,41 @@ function TopBar() {
 
 export default function App() {
   usePlaybackDriver();
+  const st = useInvestigation();
   useEffect(() => {
     void conversation.checkAi();
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
     if (mq.matches) store.dispatch({ type: 'SET_REDUCED_MOTION', value: true });
   }, []);
+  useEffect(() => {
+    document.documentElement.dataset.reducedMotion = String(st.view.reducedMotion);
+  }, [st.view.reducedMotion]);
 
   return (
     <div className="app">
-      <a href="#ask" className="skip">Skip to the question box</a>
-      <TopBar />
+      <a href="#ask" className="skip btn sm">
+        Skip to Ask
+      </a>
+      <CommandBar />
       <MissionStrip />
-      <GuidedBar />
       <main className="main">
         <div className="left">
           <ComparisonView />
           <TimelineControls />
-          <ResultStrip />
-          <LiveFeed />
         </div>
-        <InvestigationPanel />
+        <aside className="side" aria-label="Results and questions">
+          <ResultStrip />
+          <InvestigationPanel />
+        </aside>
       </main>
-      <HowItWorks />
-      <footer className="footer muted tiny">
-        Launch Detective · Track 2 “The Launch Watcher” · Educational simulation with fictional demo data — not operational launch guidance.
+      <LiveFeed />
+      <footer className="footer">
+        <span>AstroRipple · Educational simulation with fictional demo data — not launch guidance</span>
+        <button type="button" className="btn ghost sm" onClick={openHowItWorks}>
+          How it works
+        </button>
       </footer>
+      <HowItWorks />
       <Toasts />
     </div>
   );

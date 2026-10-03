@@ -15,7 +15,10 @@ export type EntryMode = 'live' | 'scripted' | 'guided' | 'fallback';
 export interface Entry {
   id: string;
   role: 'user' | 'assistant';
+  /** Headline (or full text for user turns). */
   text: string;
+  /** Optional secondary explanation shown behind "Explain". */
+  detail?: string;
   receipts?: string[];
   status?: 'pending' | 'done' | 'stale' | 'error';
   mode?: EntryMode;

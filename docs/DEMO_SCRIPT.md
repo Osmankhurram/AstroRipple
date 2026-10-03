@@ -1,11 +1,11 @@
-# Launch Detective — 75-second demo script
+# AstroRipple — 75-second demo script
 
 Setup: `npm run build && npm start`, open http://localhost:3000 full-screen. Works offline; no API key
 needed (the panel shows "Scripted demo mode"). With a key, step 6 can be a live question instead.
 
 | Time | Do | Say |
 |---|---|---|
-| 0:00 | Landing view. Point at the countdown, Window A/B chips, and the yellow weather chip. | "A countdown tells you *when* a launch happens. Launch Detective shows *why* the time matters. This is a fictional demo mission — every panel tells you where its data comes from." |
+| 0:00 | Landing view. Point at the countdown, Window A/B chips, and the yellow weather chip. | "A countdown tells you *when* a launch happens. AstroRipple shows *why* the time matters. This is a fictional demo mission — every panel tells you where its data comes from." |
 | 0:10 | Click **▶ Guided investigation**. Step 1 shows the target plane passing over the site. | "The tinted disc is the orbital plane we're aiming for. Right now the launch site sits exactly in it: 0.0 degrees." |
 | 0:18 | Step 2 — click **Different** on the prediction. | "Question: what if we delay three hours? Quick prediction — does the angle Earth rotates equal how far the site ends up from the plane?" |
 | 0:26 | Step 3 — comparison opens, Earth turns. | "Baseline on the left, experiment on the right. Earth turns 45 degrees and carries the launch site with it — but the plane stays fixed in space." |

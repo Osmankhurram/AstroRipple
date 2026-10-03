@@ -37,18 +37,14 @@ import {
   projectOntoPlane,
   siteToPlaneAngleDeg,
 } from '@/simulation/orbits';
-import type { ScenarioId } from '@/simulation/scenario';
+import { sameScenario, type ScenarioId } from '@/simulation/scenario';
 import { TRANSITION_MS, type FocusTarget, type InvestigationState } from '@/state/reducer';
 import { cameraBus, liveClock, useInvestigation } from '@/state/store';
 import { planeMatrix, simToThree } from '@/render/frameAdapter';
 import { fallbackEarthTexture, loadEarthTexture } from '@/render/earthTexture';
 
-export const COLORS = {
-  baseline: '#4cc9f0',
-  experiment: '#ff9f43',
-  angle: '#c4a7ff',
-  axis: '#8aa4c8',
-};
+import { COLORS } from './sceneColors';
+export { COLORS };
 
 /** Orbit altitude is exaggerated ×3 for visibility (documented in the legend). */
 const ALT_EXAGGERATION = 3;
@@ -109,11 +105,11 @@ function cameraGoal(st: InvestigationState, focus: FocusTarget): { pos: THREE.Ve
     const side = new THREE.Vector3().crossVectors(nT, p).normalize();
     const dir = side.multiplyScalar(Math.cos(12 * DEG)).add(nT.clone().multiplyScalar(Math.sin(12 * DEG))).normalize();
     // Aim between Earth's centre and the site so the angle annotation (outside the globe) is framed.
-    const aim = rT.clone().multiplyScalar(0.6);
-    return { pos: aim.clone().add(dir.multiplyScalar(3.3)), target: aim };
+    const aim = rT.clone().multiplyScalar(0.45);
+    return { pos: aim.clone().add(dir.multiplyScalar(4.1)), target: aim };
   }
   const dir = rT.clone().add(nT.clone().multiplyScalar(0.45)).add(new THREE.Vector3(0, 0.3, 0)).normalize();
-  return { pos: dir.multiplyScalar(4.7), target };
+  return { pos: dir.multiplyScalar(4.4), target };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -141,11 +137,11 @@ const atmosphereMaterial = () =>
     side: THREE.BackSide,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
-    uniforms: { c: { value: new THREE.Color('#4aa8ff') } },
+    uniforms: { c: { value: new THREE.Color('#8fa3c0') } },
     vertexShader: `varying vec3 vN; varying vec3 vV;
       void main(){ vec4 mv = modelViewMatrix*vec4(position,1.0); vN = normalize(normalMatrix*normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix*mv; }`,
     fragmentShader: `uniform vec3 c; varying vec3 vN; varying vec3 vV;
-      void main(){ float f = pow(1.0 - abs(dot(vN, vV)), 3.0); gl_FragColor = vec4(c, f*0.55); }`,
+      void main(){ float f = pow(1.0 - abs(dot(vN, vV)), 3.0); gl_FragColor = vec4(c, f*0.38); }`,
   });
 
 function Atmosphere() {
@@ -157,9 +153,49 @@ function Atmosphere() {
   );
 }
 
-function SiteMarker({ color, markerRef }: { color: string; markerRef: React.RefObject<THREE.Group | null> }) {
+/** The brand moment: two rings expand from the launch site whenever the experiment changes. */
+function SiteRipple({ trigger, color, reduced }: { trigger: number; color: string; reduced: boolean }) {
+  const a = useRef<THREE.Mesh>(null);
+  const b = useRef<THREE.Mesh>(null);
+  const start = useRef(-1e9);
+  useEffect(() => {
+    if (trigger > 0 && !reduced) start.current = performance.now();
+  }, [trigger, reduced]);
+  useFrame(() => {
+    const t = performance.now() - start.current;
+    ([
+      [a, 0],
+      [b, 200],
+    ] as const).forEach(([r, delay]) => {
+      const m = r.current;
+      if (!m) return;
+      const k = (t - delay) / 1000;
+      if (k < 0 || k > 1) {
+        m.visible = false;
+        return;
+      }
+      m.visible = true;
+      const e = 1 - Math.pow(1 - k, 3);
+      m.scale.setScalar(1 + 6 * e);
+      (m.material as THREE.MeshBasicMaterial).opacity = 0.75 * (1 - k);
+    });
+  });
+  return (
+    <>
+      {[a, b].map((r, i) => (
+        <mesh key={i} ref={r} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.004, 0]} visible={false} renderOrder={3}>
+          <ringGeometry args={[0.03, 0.037, 64]} />
+          <meshBasicMaterial color={color} transparent opacity={0} depthWrite={false} side={THREE.DoubleSide} />
+        </mesh>
+      ))}
+    </>
+  );
+}
+
+function SiteMarker({ color, markerRef, children }: { color: string; markerRef: React.RefObject<THREE.Group | null>; children?: React.ReactNode }) {
   return (
     <group ref={markerRef}>
+      {children}
       <mesh position={[0, 0.045, 0]}>
         <coneGeometry args={[0.022, 0.09, 16]} />
         <meshBasicMaterial color={color} />
@@ -169,7 +205,9 @@ function SiteMarker({ color, markerRef }: { color: string; markerRef: React.RefO
         <meshBasicMaterial color={color} side={THREE.DoubleSide} transparent opacity={0.85} />
       </mesh>
       <Html position={[0, 0.12, 0]} center zIndexRange={[20, 0]} style={{ pointerEvents: 'none' }}>
-        <div className="scene-label" style={{ borderColor: color }}>Launch site</div>
+        <div className="scene-label" style={{ ['--lc' as string]: color } as React.CSSProperties}>
+          Launch site
+        </div>
       </Html>
     </group>
   );
@@ -188,7 +226,7 @@ function OrbitPlane({ color, radius, highlightRef }: { color: string; radius: nu
   const ring = useMemo(() => unitCircle(256, radius), [radius]);
   const discMat = useRef<THREE.MeshBasicMaterial>(null);
   useFrame(() => {
-    if (discMat.current) discMat.current.opacity = 0.09 + 0.16 * highlightRef.current;
+    if (discMat.current) discMat.current.opacity = 0.08 + 0.16 * highlightRef.current;
   });
   const arrows = [0.15, 0.4, 0.65, 0.9].map((f) => f * TAU);
   return (
@@ -200,7 +238,7 @@ function OrbitPlane({ color, radius, highlightRef }: { color: string; radius: nu
       {/* Front segments: depth-tested solid line. */}
       <Line points={ring} color={color} lineWidth={2.2} />
       {/* Hidden segments: drawn through Earth, dashed and faint (legend: "dashed = behind Earth"). */}
-      <Line points={ring} color={color} lineWidth={1.2} dashed dashSize={0.04} gapSize={0.04} transparent opacity={0.35} depthTest={false} renderOrder={2} />
+      <Line points={ring} color={color} lineWidth={1.2} dashed dashSize={0.04} gapSize={0.04} transparent opacity={0.3} depthTest={false} renderOrder={2} />
       {arrows.map((u) => (
         <mesh key={u} position={[Math.cos(u) * radius, Math.sin(u) * radius, 0]} rotation={[0, 0, u]}>
           <coneGeometry args={[0.028, 0.08, 12]} />
@@ -337,7 +375,7 @@ function SceneContents({ which, canvasId, showGhost, containerRef, overlayRef }:
       const onScreen = q.z < 1 && Math.abs(q.x) < 1.1 && Math.abs(q.y) < 1.1;
       ov.style.display = onScreen ? 'block' : 'none';
       ov.style.transform = `translate(${((q.x * 0.5 + 0.5) * size.width).toFixed(1)}px, ${((-q.y * 0.5 + 0.5) * size.height).toFixed(1)}px) translate(-50%, -50%)`;
-      ov.textContent = visible ? `Site-to-plane ${angle.toFixed(1)}°` : 'Site in plane · 0.0°';
+      ov.textContent = visible ? `∠ ${angle.toFixed(1)}°` : '∠ 0.0° · in plane';
       ov.classList.toggle('pulse-label', p.target === 'angle' && pulseAmt > 0.05);
     }
 
@@ -354,13 +392,13 @@ function SceneContents({ which, canvasId, showGhost, containerRef, overlayRef }:
     <>
       <ambientLight intensity={0.55} />
       <CameraLight />
-      <Stars radius={60} depth={30} count={1800} factor={2.2} saturation={0} fade speed={0} />
+      <Stars radius={60} depth={30} count={1100} factor={1.8} saturation={0} fade speed={0} />
 
       {/* Inertial frame: equator and rotation axis (subtle, toggleable). */}
       {st.view.showEquator && (
-        <Line points={unitCircle(128, 1.004).map(([x, y]) => [x, 0, -y] as [number, number, number])} color="#9fb7d9" lineWidth={1} transparent opacity={0.45} />
+        <Line points={unitCircle(128, 1.004).map(([x, y]) => [x, 0, -y] as [number, number, number])} color="#6f83a6" lineWidth={1} transparent opacity={0.4} />
       )}
-      {st.view.showAxis && <Line points={[[0, -1.45, 0], [0, 1.45, 0]]} color={COLORS.axis} lineWidth={1.2} dashed dashSize={0.05} gapSize={0.04} transparent opacity={0.7} />}
+      {st.view.showAxis && <Line points={[[0, -1.45, 0], [0, 1.45, 0]]} color={COLORS.axis} lineWidth={1.2} dashed dashSize={0.05} gapSize={0.04} transparent opacity={0.55} />}
 
       <group ref={planeGroup}>
         <OrbitPlane color={color} radius={radius} highlightRef={planeHighlight} />
@@ -383,7 +421,7 @@ function SceneContents({ which, canvasId, showGhost, containerRef, overlayRef }:
             <meshBasicMaterial color={COLORS.baseline} side={THREE.DoubleSide} transparent opacity={0.9} />
           </mesh>
           <Html position={[0, -0.09, 0]} center zIndexRange={[20, 0]} style={{ pointerEvents: 'none', display: showGhost ? undefined : 'none' }}>
-            <div className="scene-label ghost-label">baseline site</div>
+            <div className="scene-label ghost-label">Baseline site</div>
           </Html>
         </group>
       )}
@@ -391,7 +429,11 @@ function SceneContents({ which, canvasId, showGhost, containerRef, overlayRef }:
       {/* Earth-fixed frame. */}
       <group ref={earthGroup}>
         <Earth />
-        <SiteMarker color={color} markerRef={marker} />
+        <SiteMarker color={color} markerRef={marker}>
+          {which === 'experiment' && (
+            <SiteRipple trigger={st.revision} color={sameScenario(st.experiment, st.baseline) ? COLORS.baseline : COLORS.experiment} reduced={st.view.reducedMotion} />
+          )}
+        </SiteMarker>
       </group>
       <Atmosphere />
 
@@ -565,7 +607,7 @@ export function GlobeCanvas({ which, showGhost, label, active = true }: { which:
       aria-label={`${label} 3D globe. Drag to rotate, scroll to zoom. Keyboard: arrow keys rotate, plus and minus zoom, 0 resets the camera.`}
     >
       <Canvas frameloop={active ? 'always' : 'never'} dpr={[1, 1.5]} camera={{ fov: 38, near: 0.05, far: 200, position: [0, 1, 4.5] }} gl={{ antialias: true, powerPreference: 'high-performance' }}>
-        <color attach="background" args={['#050b18']} />
+        <color attach="background" args={['#070b14']} />
         <SceneContents which={which} canvasId={canvasId} showGhost={showGhost} containerRef={containerRef} overlayRef={overlayRef} />
       </Canvas>
       <div ref={overlayRef} className="scene-label angle-label angle-overlay" aria-hidden="true" />
