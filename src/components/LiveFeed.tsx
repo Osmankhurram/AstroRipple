@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react';
 import type { RealLaunch } from '@/data/launchAdapter';
 import type { WeatherAssessment } from '@/simulation/weather';
 import { fmtUtc, formatCountdown } from '@/state/clock';
-import { ProvenanceBadge } from './ui';
+import { InfoTip, ProvenanceDot } from './ui';
 import { WeatherDetails } from './WeatherIndicator';
 
 interface LiveResponse {
@@ -24,9 +24,9 @@ function age(iso?: string) {
 
 function RealCountdown({ l, now }: { l: RealLaunch; now: number }) {
   const ms = Date.parse(l.netUtc) - now;
-  if (l.precision !== 'exact') return <span className="muted small">NET {fmtUtc(l.netUtc).split(' ').slice(0, 2).join(' ')} · {l.precisionLabel} precision — no exact countdown</span>;
-  if (ms <= 0) return <span className="muted small">NET {fmtUtc(l.netUtc)} (time reached — check status)</span>;
-  return <span className="tabular">T−{formatCountdown(ms)}</span>;
+  if (l.precision !== 'exact') return <span title={`${l.precisionLabel} precision — no exact countdown`}>NET {fmtUtc(l.netUtc).split(' ').slice(0, 2).join(' ')} · ~{l.precisionLabel.toLowerCase()}</span>;
+  if (ms <= 0) return <span>NET {fmtUtc(l.netUtc)}</span>;
+  return <span className="cd">T−{formatCountdown(ms)}</span>;
 }
 
 export function LiveFeed() {
@@ -51,53 +51,51 @@ export function LiveFeed() {
   };
 
   return (
-    <details className="livefeed">
-      <summary>
-        Real-world feed <span className="muted small">(optional · separate from the demo mission)</span>
-      </summary>
-      <div className="livefeed-body">
+    <section className="card livefeed" aria-label="Real-world launches">
+      <div className="livefeed-head">
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+          <span className="label">Real-world launches</span>
+          <InfoTip label="About the real-world feed">Optional and separate from the demo mission: upcoming launches from Launch Library 2 and the current Open-Meteo forecast for the Florida coast. Cached on the server.</InfoTip>
+          {data?.enabled && data.launches ? <ProvenanceDot p={data.launches.provenance} label="Schedule" /> : null}
+        </span>
         {!data && (
-          <button type="button" onClick={load} disabled={state === 'loading'}>
-            {state === 'loading' ? 'Loading…' : 'Load real launches & Florida forecast'}
+          <button type="button" className="btn sm" onClick={load} disabled={state === 'loading'}>
+            {state === 'loading' ? 'Loading…' : 'Load ›'}
           </button>
         )}
-        {state === 'error' && <p className="muted small">Could not reach the server. The demo is unaffected.</p>}
-        {data && !data.enabled && <p className="muted small">The live feed is disabled on this server (set LD_ENABLE_LIVE_DATA=1). The demo mission always uses local fixtures.</p>}
-        {data?.enabled && (
-          <div className="livefeed-grid">
-            <section>
-              <div className="label-row">
-                <strong>Upcoming real launches</strong>
-                <ProvenanceBadge p={data.launches!.provenance} label="Schedule" />
-              </div>
-              {data.launches!.items.length ? (
-                <ul className="real-launches">
-                  {data.launches!.items.map((l) => (
-                    <li key={l.id}>
-                      <div>{l.name}</div>
-                      <div className="muted small">
-                        {l.status} · <RealCountdown l={l} now={now} />
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="muted small">Schedule unavailable right now.</p>
-              )}
-              <p className="muted tiny">
-                {data.launches!.fetchedAt ? `${data.launches!.source} · fetched ${age(data.launches!.fetchedAt)} · cached 30 min. ` : 'Launch Library 2 did not respond (its free tier is rate-limited); try again later. '}
-                What-if experiments never change these schedules.
-              </p>
-            </section>
-            <section>
-              <WeatherDetails w={data.weather!.assessment} title={`Now at ${data.weather!.site}`} />
-              <p className="muted tiny">
-                {data.weather!.source ?? 'Forecast'} · fetched {age(data.weather!.fetchedAt)} · same demo thresholds — not launch-commit criteria.
-              </p>
-            </section>
-          </div>
-        )}
       </div>
-    </details>
+      {state === 'error' && <p className="muted small">■ Could not reach the server. The demo is unaffected.</p>}
+      {data && !data.enabled && (
+        <p className="muted small" title="Set LD_ENABLE_LIVE_DATA=1 to enable. The demo mission always uses local fixtures.">
+          Live feed is off on this server.
+        </p>
+      )}
+      {data?.enabled && (
+        <div className="livefeed-grid">
+          <div>
+            {data.launches!.items.length ? (
+              <ul className="real-launches">
+                {data.launches!.items.map((l) => (
+                  <li key={l.id}>
+                    <div className="name">{l.name}</div>
+                    <div className="meta">
+                      <span>{l.status}</span>
+                      <RealCountdown l={l} now={now} />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="muted small">■ Schedule unavailable right now (the free Launch Library 2 tier is rate-limited).</p>
+            )}
+            {data.launches!.fetchedAt && <span className="mono muted small">Launch Library 2 · {age(data.launches!.fetchedAt)}</span>}
+          </div>
+          <div>
+            <WeatherDetails w={data.weather!.assessment} title={`Now · ${data.weather!.site}`} />
+            {data.weather!.fetchedAt && <span className="mono muted small">Open-Meteo · {age(data.weather!.fetchedAt)}</span>}
+          </div>
+        </div>
+      )}
+    </section>
   );
 }

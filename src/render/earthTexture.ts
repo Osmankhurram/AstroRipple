@@ -9,11 +9,11 @@ import type { Topology, GeometryCollection } from 'topojson-specification';
 const W = 2048;
 const H = 1024;
 
-const OCEAN_TOP = '#0c2440';
-const OCEAN_BOTTOM = '#0a1d36';
-const LAND = '#2e5a5c';
-const LAND_EDGE = '#5f9a96';
-const GRID = 'rgba(160, 200, 230, 0.10)';
+const OCEAN_TOP = '#0c1826';
+const OCEAN_BOTTOM = '#091320';
+const LAND = '#25374a';
+const LAND_EDGE = 'rgba(126, 154, 178, 0.75)';
+const GRID = 'rgba(160, 190, 230, 0.07)';
 
 function baseCanvas(): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } {
   const canvas = document.createElement('canvas');
@@ -22,7 +22,7 @@ function baseCanvas(): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2
   const ctx = canvas.getContext('2d')!;
   const g = ctx.createLinearGradient(0, 0, 0, H);
   g.addColorStop(0, OCEAN_TOP);
-  g.addColorStop(0.5, '#0d2a49');
+  g.addColorStop(0.5, '#0d1b2c');
   g.addColorStop(1, OCEAN_BOTTOM);
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, W, H);

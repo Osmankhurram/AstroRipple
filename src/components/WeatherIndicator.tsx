@@ -2,55 +2,64 @@
 import type { WeatherAssessment, WeatherStatus } from '@/simulation/weather';
 import { describeThresholds } from '@/simulation/weather';
 import { fmtUtc } from '@/state/clock';
-import { InfoTip, ProvenanceBadge } from './ui';
+import { InfoTip, ProvenanceDot } from './ui';
 
 const LABEL: Record<WeatherStatus, string> = { green: 'Green', yellow: 'Yellow', red: 'Red', unknown: 'Unknown' };
 const ICON: Record<WeatherStatus, string> = { green: '●', yellow: '▲', red: '■', unknown: '?' };
+const HIT_COLOR: Record<string, string> = { red: 'var(--wx-red)', yellow: 'var(--wx-yellow)' };
 
 export function WeatherChip({ status, small }: { status: WeatherStatus; small?: boolean }) {
   return (
     <span className={`wx-chip wx-${status} ${small ? 'wx-small' : ''}`}>
-      <span aria-hidden="true">{ICON[status]}</span> {LABEL[status]}
+      <span className="glyph" aria-hidden="true">
+        {ICON[status]}
+      </span>
+      {LABEL[status]}
     </span>
   );
 }
 
 export function WeatherDetails({ w, title }: { w: WeatherAssessment; title: string }) {
   const s = w.sample;
+  const hit = (field: string) => w.reasons.find((r) => r.field === field && r.level !== 'info');
+  const cell = (field: string, dt: string, value: string) => {
+    const h = hit(field);
+    return (
+      <div className={h ? 'wx-hit' : ''} style={h ? ({ ['--hit-c' as string]: HIT_COLOR[h.level] } as React.CSSProperties) : undefined}>
+        <dt>{dt}</dt>
+        <dd>{value}</dd>
+      </div>
+    );
+  };
   return (
     <div className="wx-details">
       <div className="wx-details-head">
-        <strong>{title}</strong> <WeatherChip status={w.status} small /> <ProvenanceBadge p={w.provenance} />
+        <strong>{title}</strong>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <WeatherChip status={w.status} small />
+          <ProvenanceDot p={w.provenance} label="Weather" />
+        </span>
       </div>
       {s ? (
         <dl className="wx-grid">
-          <div className={w.reasons.some((r) => r.field === 'gusts') ? 'wx-hit' : ''}>
-            <dt>Gusts</dt>
-            <dd>{s.gustsKmh ?? '—'} km/h</dd>
-          </div>
-          <div className={w.reasons.some((r) => r.field === 'precipitation') ? 'wx-hit' : ''}>
-            <dt>Precip. prob.</dt>
-            <dd>{s.precipProbPct ?? '—'}%</dd>
-          </div>
-          <div className={w.reasons.some((r) => r.field === 'cloud') ? 'wx-hit' : ''}>
-            <dt>Cloud cover</dt>
-            <dd>{s.cloudCoverPct ?? '—'}%</dd>
-          </div>
-          <div>
-            <dt>Wind</dt>
-            <dd>{s.windKmh ?? '—'} km/h</dd>
-          </div>
+          {cell('gusts', 'GUSTS', `${s.gustsKmh ?? '—'} km/h`)}
+          {cell('precipitation', 'RAIN', `${s.precipProbPct ?? '—'}%`)}
+          {cell('cloud', 'CLOUD', `${s.cloudCoverPct ?? '—'}%`)}
+          {cell('none', 'WIND', `${s.windKmh ?? '—'} km/h`)}
         </dl>
       ) : null}
       <ul className="wx-reasons">
         {w.reasons.map((r, i) => (
-          <li key={i} className={`lvl-${r.level}`}>
-            {r.text}
-          </li>
+          <li key={i}>{r.text}</li>
         ))}
       </ul>
-      {s ? <p className="muted tiny">Matched to forecast hour {fmtUtc(s.timeUtc)}.</p> : null}
-      {w.viewingNote ? <p className="muted tiny">Viewing (not a safety signal): {w.viewingNote}</p> : null}
+      {s ? <span className="mono muted small">Forecast hour {fmtUtc(s.timeUtc)}</span> : null}
+      {w.viewingNote ? (
+        <p className="wx-note">
+          <b>Viewing only — not a safety signal</b>
+          {w.viewingNote}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -58,7 +67,7 @@ export function WeatherDetails({ w, title }: { w: WeatherAssessment; title: stri
 export function ThresholdHelp() {
   return (
     <InfoTip label="Weather indicator thresholds">
-      <strong>Demo weather-impact heuristic</strong>
+      <strong>Demo weather heuristic</strong>
       <ul>
         {describeThresholds().map((t) => (
           <li key={t}>{t}</li>

@@ -1,9 +1,9 @@
-# Launch Detective (AstroRipple)
+# AstroRipple
 
 **Ask why about a rocket launch — and see the answer happen.**
 
-Launch Detective is an interactive 3D "what if?" exhibit for a rocket launch. A countdown tells you
-*when* a launch is scheduled; Launch Detective shows *why* time, launch site, orbit, and weather
+AstroRipple is an interactive 3D "what if?" exhibit for a rocket launch. A countdown tells you
+*when* a launch is scheduled; AstroRipple shows *why* time, launch site, orbit, and weather
 matter. Ask a question (or use the controls), and the app changes an experiment copy of the
 mission, animates the consequence on a WebGL globe next to the untouched baseline, and explains the
 result from the actual calculation.

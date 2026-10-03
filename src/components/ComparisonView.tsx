@@ -2,17 +2,20 @@
 import dynamic from 'next/dynamic';
 import { useEffect, useState } from 'react';
 import { computeMetrics } from '@/simulation/metrics';
-import { ORBIT_PRESET_INFO } from '@/simulation/orbits';
 import { fmtOffset, sameScenario, type ScenarioId } from '@/simulation/scenario';
-import { fmtUtc } from '@/state/clock';
 import { store, useInvestigation } from '@/state/store';
-import { COLORS } from './GlobeScene';
-import { useMediaQuery, useTransitioning } from './ui';
+import { GuidedBar, useGuidedActive } from './GuidedDemo';
+import { IconOverview, IconPlane, IconSite } from './icons';
+import { ANGLE_DISCLAIMER } from './ResultStrip';
+import { COLORS } from './sceneColors';
+import { InfoTip, Popover, useMediaQuery, useTransitioning, useTween } from './ui';
 
 const GlobeCanvas = dynamic(() => import('./GlobeScene').then((m) => m.GlobeCanvas), {
   ssr: false,
-  loading: () => <div className="globe-canvas loading">Loading 3D globe…</div>,
+  loading: () => <div className="globe-canvas loading">Initialising globe</div>,
 });
+
+const PRESET_SHORT = { 'inclined-leo': 'Inclined', polar: 'Polar', 'sso-example': 'SSO-like' } as const;
 
 function hasWebGL(): boolean {
   try {
@@ -34,47 +37,110 @@ function Schematic({ which }: { which: ScenarioId }) {
   return (
     <div className="globe-canvas schematic">
       <svg viewBox="-160 -130 320 260" role="img" aria-label={`Schematic: site-to-plane angle ${m.siteToPlaneAngleDeg.toFixed(1)} degrees`}>
-        <circle r={R} fill="#0d2a49" stroke="#5f9a96" />
+        <circle r={R} fill="#0f2236" stroke="#5e6b86" />
         <line x1={-150} x2={150} y1={0} y2={0} stroke={color} strokeWidth={2} />
-        <text x={-150} y={-6} fill={color} fontSize={10}>target plane (edge-on)</text>
         <line x1={0} y1={0} x2={Math.cos(a) * 120} y2={-Math.sin(a) * 120} stroke={COLORS.angle} strokeWidth={1.5} />
         <circle cx={Math.cos(a) * R} cy={-Math.sin(a) * R} r={6} fill={color} />
-        <path d={`M ${110} 0 A 110 110 0 0 0 ${Math.cos(a) * 110} ${-Math.sin(a) * 110}`} fill="none" stroke={COLORS.angle} strokeWidth={3} />
-        <text x={118} y={-Math.sin(a / 2) * 118 - 4} fill={COLORS.angle} fontSize={11}>{m.siteToPlaneAngleDeg.toFixed(1)}°</text>
+        <path d={`M 110 0 A 110 110 0 0 0 ${Math.cos(a) * 110} ${-Math.sin(a) * 110}`} fill="none" stroke={COLORS.angle} strokeWidth={3} />
       </svg>
-      <p className="muted tiny">WebGL is unavailable, so a 2D schematic is shown. Controls and metrics work the same.</p>
+      <span>2D schematic · WebGL unavailable</span>
     </div>
   );
 }
 
-function SceneHeader({ which }: { which: ScenarioId }) {
+function Hud({ which, showScale }: { which: ScenarioId; showScale: boolean }) {
   const st = useInvestigation();
   const sc = which === 'baseline' ? st.baseline : st.experiment;
-  const m = computeMetrics(sc, st.baseline, st.mission);
-  const color = which === 'baseline' ? COLORS.baseline : COLORS.experiment;
+  const m = computeMetrics(sc, st.baseline, st.mission, st.view.playbackOffsetSec);
+  const angle = useTween(m.siteToPlaneAngleDeg, !st.view.reducedMotion, 1150);
+  const d = new Date(sc.launchTimeUtc);
+  const pad = (x: number) => String(x).padStart(2, '0');
+  const hypothetical = which === 'experiment' && m.offsetMinutes !== 0;
   return (
-    <div className="scene-head" style={{ borderColor: color }}>
-      <span className="scene-name" style={{ color }}>
-        {which === 'baseline' ? 'Baseline' : `Experiment ${m.offsetMinutes ? fmtOffset(m.offsetMinutes) : ''}`}
-      </span>
-      <span className="muted small tabular">
-        {fmtUtc(sc.launchTimeUtc)}
-        {which === 'experiment' && m.offsetMinutes !== 0 ? ' (hypothetical)' : ''} · {ORBIT_PRESET_INFO[sc.orbitPreset].shortLabel}
-      </span>
+    <>
+      <div className="hud tl" title={`${sc.launchTimeUtc}${hypothetical ? ' (hypothetical)' : ''}`}>
+        <div className="hud-title">
+          <span className="letter">{which === 'baseline' ? 'B' : 'E'}</span>
+          {which === 'baseline' ? 'Baseline' : 'Experiment'}
+          {hypothetical ? <span className="off">{fmtOffset(m.offsetMinutes)}</span> : null}
+        </div>
+        <div className="hud-sub">
+          <span>
+            {pad(d.getUTCHours())}:{pad(d.getUTCMinutes())} UTC
+          </span>
+          {hypothetical ? <span className="tag">Hypothetical</span> : null}
+          <span>
+            · {PRESET_SHORT[sc.orbitPreset]} {sc.inclinationDeg}°
+          </span>
+        </div>
+      </div>
+      <div className="hud bl">
+        <div className="hud-angle">
+          <span className="num" aria-hidden="true">
+            ∠ {angle.toFixed(1)}°
+          </span>
+          <span className="label plain">Site-to-plane</span>
+          <InfoTip label="About the site-to-plane angle">{ANGLE_DISCLAIMER}</InfoTip>
+        </div>
+      </div>
+      {showScale && (
+        <div className="hud br">
+          <span className="label plain">Not to scale</span>
+          <InfoTip label="About scale">Orbit altitude exaggerated ×3. Lighting and frame orientation are illustrative.</InfoTip>
+        </div>
+      )}
+    </>
+  );
+}
+
+function Pane({ which, active, webgl, differs, showScale }: { which: ScenarioId; active: boolean; webgl: boolean; differs: boolean; showScale: boolean }) {
+  const st = useInvestigation();
+  const updating = useTransitioning(st.view.transitionUntil) && which === 'experiment';
+  const scen = which === 'baseline' ? COLORS.baseline : COLORS.experiment;
+  return (
+    <div className="pane" hidden={!active}>
+      <div className={`porthole ${updating ? 'updating' : ''}`} style={{ ['--scen' as string]: scen } as React.CSSProperties} aria-busy={updating}>
+        {webgl ? <GlobeCanvas which={which} showGhost={which === 'experiment' && differs} label={which} active={active} /> : <Schematic which={which} />}
+        <div className="vignette" aria-hidden="true" />
+        <div className="brackets" aria-hidden="true" />
+        <div className="sweep" aria-hidden="true" key={updating ? `s${st.view.transitionNonce}` : 'idle'} />
+        <Hud which={which} showScale={showScale} />
+        {updating && <span className="sr-only">Updating</span>}
+      </div>
     </div>
   );
 }
 
-export function Legend() {
+function Legend() {
   return (
     <div className="legend" aria-label="Legend">
-      <span><i className="lg-line" style={{ background: COLORS.baseline }} /> Baseline</span>
-      <span><i className="lg-line" style={{ background: COLORS.experiment }} /> Experiment</span>
-      <span><i className="lg-line" style={{ background: COLORS.angle }} /> Site-to-plane angle</span>
-      <span><i className="lg-ring" /> Baseline site (ghost)</span>
-      <span><i className="lg-dash" /> Dashed = behind Earth / in-plane reference</span>
-      <span><i className="lg-dot" /> Satellite marker (phase not modelled)</span>
-      <span className="muted">Orbit altitude exaggerated ×3 · lighting illustrative · frame orientation illustrative</span>
+      <span>
+        <i className="sw" style={{ background: COLORS.baseline }} /> Baseline
+      </span>
+      <span>
+        <i className="sw" style={{ background: COLORS.experiment }} /> Experiment
+      </span>
+      <span>
+        <i className="sw" style={{ background: COLORS.angle }} /> Site-to-plane angle
+      </span>
+      <span className="grow" />
+      <Popover label="More ▾" className="btn sm ghost" ariaLabel="More legend items">
+        <ul className="key-list">
+          <li>
+            <i className="sw ring" /> Baseline site (ghost ring)
+          </li>
+          <li>
+            <i className="sw dash" /> Dashed: behind Earth / in-plane reference
+          </li>
+          <li>
+            <i className="sw dot" /> Satellite marker (orbital phase not modelled)
+          </li>
+          <li>
+            <span style={{ width: 22, textAlign: 'center', color: 'var(--text-2)' }}>▸</span> Direction of travel
+          </li>
+        </ul>
+        <div className="foot-note">Altitude ×3 · lighting &amp; frame illustrative</div>
+      </Popover>
     </div>
   );
 }
@@ -84,52 +150,68 @@ export function ComparisonView() {
   const narrow = useMediaQuery('(max-width: 900px)');
   const [webgl, setWebgl] = useState(true);
   useEffect(() => setWebgl(hasWebGL()), []);
-  const transitioning = useTransitioning(st.view.transitionUntil);
+  const tour = useGuidedActive();
 
   const compare = st.view.mode === 'compare';
   const differs = !sameScenario(st.experiment, st.baseline);
-  // Plain render helper (not a component) so canvases are not remounted on every render.
-  const renderScene = (which: ScenarioId, active: boolean) =>
-    webgl ? <GlobeCanvas which={which} showGhost={which === 'experiment' && differs} label={which} active={active} /> : <Schematic which={which} />;
+  const panes: ScenarioId[] = compare && !narrow ? ['baseline', 'experiment'] : [st.view.shown];
+  const selected = compare && !narrow ? 'compare' : st.view.shown;
+  const lastPane = panes[panes.length - 1];
 
-  let panes: ScenarioId[];
-  if (!compare) panes = [st.view.shown];
-  else if (narrow) panes = [st.view.shown];
-  else panes = ['baseline', 'experiment'];
+  const choose = (v: 'compare' | ScenarioId) => {
+    if (v === 'compare') store.dispatch({ type: 'SET_VIEW_MODE', mode: 'compare' });
+    else {
+      if (!narrow) store.dispatch({ type: 'SET_VIEW_MODE', mode: 'single' });
+      store.dispatch({ type: 'SET_SHOWN', shown: v });
+    }
+  };
+  const options: { v: 'compare' | ScenarioId; label: string; c: string }[] = [
+    ...(narrow ? [] : [{ v: 'compare' as const, label: 'Compare', c: 'var(--signal)' }]),
+    { v: 'baseline', label: 'Baseline', c: COLORS.baseline },
+    { v: 'experiment', label: 'Experiment', c: COLORS.experiment },
+  ];
 
   return (
-    <section className="stage" aria-label="3D investigation view">
+    <section className="card stage" aria-label="Globe comparison">
       <div className="stage-toolbar">
-        {(compare && narrow) || !compare ? (
-          <div className="seg small" role="tablist" aria-label="Scenario shown">
-            {(['baseline', 'experiment'] as ScenarioId[]).map((w) => (
-              <button key={w} role="tab" aria-selected={st.view.shown === w} className={st.view.shown === w ? 'on' : ''} onClick={() => store.dispatch({ type: 'SET_SHOWN', shown: w })}>
-                {w === 'baseline' ? 'Baseline' : 'Experiment'}
-              </button>
-            ))}
-          </div>
+        {tour ? (
+          <GuidedBar />
         ) : (
-          <span className="muted small">Side-by-side · common playback offset · {st.view.syncCameras ? 'cameras synced' : 'cameras independent'}</span>
-        )}
-        <div className="seg small" aria-label="Camera">
-          <button onClick={() => store.dispatch({ type: 'FOCUS', target: 'overview' })}>Overview</button>
-          <button onClick={() => store.dispatch({ type: 'FOCUS', target: 'launch-site' })}>Focus launch site</button>
-          <button onClick={() => store.dispatch({ type: 'FOCUS', target: 'orbital-plane' })}>View orbital plane</button>
-        </div>
-        {transitioning && <span className="transition-badge">Transitioning…</span>}
-      </div>
-      {/* Both canvases stay mounted (no WebGL context churn, camera state kept); the inactive one is
-          hidden and its render loop paused. */}
-      <div className={`panes n${panes.length}`}>
-        {(['baseline', 'experiment'] as ScenarioId[]).map((w) => {
-          const active = panes.includes(w);
-          return (
-            <div className="pane" key={w} hidden={!active}>
-              <SceneHeader which={w} />
-              {renderScene(w, active)}
+          <>
+            <div className="seg" role="radiogroup" aria-label="View">
+              {options.map((o) => (
+                <button
+                  key={o.v}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected === o.v}
+                  style={{ ['--seg-c' as string]: o.c } as React.CSSProperties}
+                  onClick={() => choose(o.v)}
+                >
+                  <i className="led" style={{ ['--c' as string]: o.c } as React.CSSProperties} />
+                  {o.label}
+                </button>
+              ))}
             </div>
-          );
-        })}
+            <span className="grow" />
+            <div className="cam-btns" role="group" aria-label="Camera">
+              <button type="button" className="btn sm" onClick={() => store.dispatch({ type: 'FOCUS', target: 'overview' })} aria-label="Overview" title="Overview">
+                <IconOverview /> <span className="txt">Overview</span>
+              </button>
+              <button type="button" className="btn sm" onClick={() => store.dispatch({ type: 'FOCUS', target: 'launch-site' })} aria-label="Focus launch site" title="Focus launch site">
+                <IconSite /> <span className="txt">Launch site</span>
+              </button>
+              <button type="button" className="btn sm" onClick={() => store.dispatch({ type: 'FOCUS', target: 'orbital-plane' })} aria-label="View orbital plane" title="View the orbital plane edge-on">
+                <IconPlane /> <span className="txt">Orbit plane</span>
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+      <div className={`panes n${panes.length}`}>
+        {(['baseline', 'experiment'] as ScenarioId[]).map((w) => (
+          <Pane key={w} which={w} active={panes.includes(w)} webgl={webgl} differs={differs} showScale={w === lastPane} />
+        ))}
       </div>
       <Legend />
     </section>
