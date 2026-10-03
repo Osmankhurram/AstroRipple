@@ -74,7 +74,7 @@ export function InfoTip({ children, label = 'More info' }: { children: React.Rea
         aria-expanded={open}
         onFocus={() => setOpen(true)}
         onBlur={() => setOpen(false)}
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => setOpen(true)}
       >
         i
       </button>

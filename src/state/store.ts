@@ -30,7 +30,8 @@ export const store = {
     if (r.state !== state) {
       state = r.state;
       if (action.type === 'SET_PLAYBACK') liveClock.playbackSec = r.state.view.playbackOffsetSec;
-      if (action.type !== 'SET_PLAYBACK' && r.state.view.playbackOffsetSec === 0) liveClock.playbackSec = 0;
+      if (action.type !== 'SET_PLAYBACK' && action.type !== 'SET_PLAYING' && r.state.view.playbackOffsetSec !== liveClock.playbackSec && !r.state.view.playing) liveClock.playbackSec = r.state.view.playbackOffsetSec;
+      liveClock.speed = r.state.view.playbackSpeed;
       emit();
     }
     return r.error;
@@ -40,6 +41,7 @@ export const store = {
     if (r.state !== state) {
       state = r.state;
       liveClock.playbackSec = r.state.view.playbackOffsetSec;
+      liveClock.speed = r.state.view.playbackSpeed;
       emit();
     }
     return r;

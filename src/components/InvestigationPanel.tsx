@@ -59,7 +59,7 @@ const MODE_TAG: Record<string, string> = { live: 'Claude', guided: 'Guide', fall
 
 function EntryView({ e, newest }: { e: Entry; newest: boolean }) {
   const shown = useReveal(e.revealAt);
-  if (e.role === 'user') return <li className="msg user">{e.text}</li>;
+  if (e.role === 'user') return <li className="msg user"><span className="sr-only">You: </span>{e.text}</li>;
   const parsed = e.detail !== undefined ? { lead: e.text, rest: e.detail ? [e.detail] : [], limit: undefined } : parseAnswer(e.text);
   const hasMore = parsed.rest.length > 0 || (!newest && !!parsed.limit) || !!e.evidence?.length;
   return (
@@ -97,7 +97,7 @@ function EntryView({ e, newest }: { e: Entry; newest: boolean }) {
           {newest && parsed.limit ? <p className="limit">{parsed.limit}</p> : null}
           {hasMore ? (
             <details className="explain" open={newest && !!e.evidence?.length}>
-              <summary>{e.evidence?.length ? 'Evidence & details' : 'More'}</summary>
+              <summary>{e.evidence?.length ? 'Evidence & details' : 'Explanation'}</summary>
               <div>
                 {parsed.rest.map((t, i) => (
                   <p key={i} style={{ margin: 0 }}>
@@ -142,64 +142,89 @@ export function InvestigationPanel() {
   return (
     <section className="card ask-panel" aria-labelledby="ask-h" id="ask-panel">
       <div className="ask-head">
-        <div>
+        <div className="ask-intro">
           <h2 id="ask-h">Ask AstroRipple</h2>
-          <p>Change one thing. Watch the ripple.</p>
+          <p>Your mission, explored one question at a time.</p>
         </div>
         {c.ai.checked ? (
           c.ai.available ? (
-            <span className="mode-tag" tabIndex={0} title={`Answers come from Claude (${c.ai.model}) through a server-side tool-calling route.`}>
+            <span className="mode-tag" tabIndex={0} title={`Claude${c.ai.model ? ` (${c.ai.model})` : ''} can update your scenario and explain the results.`}>
               <i className="led breathe" style={{ ['--c' as string]: 'var(--signal)' } as React.CSSProperties} /> Live AI
             </span>
           ) : (
-            <span className="mode-tag" tabIndex={0} title="No API key configured. Supported questions run deterministic commands with template explanations. This is not an AI model.">
+            <span className="mode-tag" tabIndex={0} title="Built-in questions update the scenario with scripted explanations. Live AI is unavailable.">
               <i className="led" style={{ ['--c' as string]: 'var(--text-3)' } as React.CSSProperties} /> Scripted
             </span>
           )
         ) : (
-          <span className="mode-tag">…</span>
+          <span className="mode-tag" role="status">Checking…</span>
         )}
       </div>
 
-      <div className={`chips ${empty ? 'tiles' : 'row'}`} role="group" aria-label="Suggested questions">
-        {SUGGESTIONS.map((s) => (
-          <button key={s.q} type="button" className="btn chip" onClick={() => submit(s.q)} disabled={c.busy} aria-label={s.q} title={s.q}>
-            <span className="ico">{s.icon}</span>
-            {s.label}
-          </button>
-        ))}
-      </div>
-
-      <ol className="messages" ref={listRef} aria-live="polite">
+      <ol className="messages" ref={listRef} aria-label="Investigation conversation" aria-live="polite" aria-relevant="additions text" tabIndex={0}>
         {empty ? (
           <li className="msg empty">
-            <svg width="44" height="44" viewBox="0 0 32 32" aria-hidden="true">
-              <circle cx="16" cy="16" r="3" fill="none" stroke="#c4a7ff" strokeWidth="1.3" />
-              <circle cx="16" cy="16" r="8" fill="none" stroke="#a3b1c7" strokeOpacity=".5" strokeWidth="1.2" />
-              <circle cx="16" cy="16" r="13" fill="none" stroke="#a3b1c7" strokeOpacity=".25" strokeWidth="1.2" />
+            <svg width="40" height="40" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+              <circle cx="20" cy="20" r="3" fill="var(--signal)" />
+              <circle cx="20" cy="20" r="12" stroke="currentColor" strokeOpacity=".45" />
+              <path d="M20 1v5m0 28v5M1 20h5m28 0h5" stroke="currentColor" />
+              <circle cx="30" cy="13.4" r="2" fill="var(--signal)" />
             </svg>
-            Every answer moves the globe — and its manual control.
+            <h3 className="ask-empty-title">One change.<br />A new perspective.</h3>
+            <p className="ask-empty-copy">Shift a launch, explore an orbit, or compare windows. Watch your question take shape on the globe.</p>
           </li>
         ) : (
           c.entries.map((e) => <EntryView key={e.id} e={e} newest={e.id === newestAssistant} />)
         )}
       </ol>
 
-      <form
-        className="ask-form"
-        onSubmit={(e) => {
-          e.preventDefault();
-          submit(q);
-        }}
-      >
-        <label htmlFor="ask" className="sr-only">
-          Ask AstroRipple a what-if question
-        </label>
-        <input id="ask" value={q} maxLength={600} onChange={(e) => setQ(e.target.value)} placeholder="e.g. launch 90 min earlier" autoComplete="off" />
-        <button type="submit" className="btn primary" disabled={c.busy || !q.trim()} aria-label="Ask">
-          {c.busy ? '…' : <IconSend />} Ask
-        </button>
-      </form>
+      <div className="ask-suggestions">
+        <span className="ask-suggestions-label">{empty ? 'Start with a question' : 'Explore another change'}</span>
+        <div className="chips row" role="group" aria-label="Suggested questions">
+          {SUGGESTIONS.map((s) => (
+            <button
+              key={s.q}
+              type="button"
+              className="btn chip"
+              onClick={() => submit(s.q)}
+              disabled={c.busy}
+              aria-label={s.q}
+              title={s.q}
+            >
+              <span className="ico" aria-hidden="true">{s.icon}</span>
+              {s.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="ask-composer">
+        <form
+          className="ask-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            submit(q);
+          }}
+        >
+          <label htmlFor="ask" className="sr-only">
+            Ask AstroRipple a what-if question
+          </label>
+          <input
+            id="ask"
+            value={q}
+            maxLength={600}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="What if we launch later?"
+            autoComplete="off"
+            enterKeyHint="send"
+            aria-describedby="ask-hint"
+          />
+          <button type="submit" className="btn primary" disabled={c.busy || !q.trim()} aria-label={c.busy ? 'Investigating your question' : 'Ask AstroRipple'}>
+            {c.busy ? '…' : <IconSend />} Ask
+          </button>
+        </form>
+        <p className="ask-hint" id="ask-hint">{c.busy ? 'Investigating your scenario…' : 'Enter to ask · Changes stay in sync with the controls.'}</p>
+      </div>
     </section>
   );
 }

@@ -6,9 +6,11 @@ rendering. Everything here is an intentionally simplified educational model.
 ## Frame
 
 - **Demo inertial frame** ("ECI-like"): right-handed, +z through the geographic north pole,
-  east-positive longitude. Reference epoch `FRAME_EPOCH` = 2026-01-01T00:00:00Z with θ(epoch) = 0.
-  The frame's orientation relative to the stars is **illustrative**: no sidereal-time model,
-  precession, nutation, or polar motion.
+  east-positive longitude. Reference epoch `FRAME_EPOCH` = 2026-01-01T00:00:00Z with θ(epoch) =
+  GMST(epoch) = 1.756863 rad (satellite.js `gstime`), so θ(t) tracks Greenwich Mean Sidereal Time
+  within ~0.016° over 2026 — consistent with Satellite Mode's TEME→ECF conversion. Precession,
+  nutation, polar motion, and UT1−UTC are not modelled. (Earlier versions used θ(epoch) = 0; every
+  site-to-plane result is unchanged because planes are constructed from θ at the baseline time.)
 - **Earth rotation**: θ(t) = θ_epoch + ω·(t − epoch), with ω = 7.292115 × 10⁻⁵ rad/s (sidereal).
   A 2-hour delay rotates Earth by ≈ 30.08°.
 - **Spherical Earth**, unit radius for geometry.

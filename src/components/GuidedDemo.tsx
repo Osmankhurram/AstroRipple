@@ -145,13 +145,16 @@ export function startGuided() {
   conversation.clear();
   setG({ active: true, step: 0, prediction: null });
   STEPS[0].run();
+  requestAnimationFrame(() => {
+    document.getElementById('orbital-view')?.scrollIntoView({ block: 'start', behavior: store.get().view.reducedMotion ? 'auto' : 'smooth' });
+  });
 }
 
 export function GuidedButton() {
   const g = useGuided();
   return (
-    <button type="button" className={`btn ${g.active ? '' : 'primary'}`} onClick={startGuided} aria-pressed={g.active} title={g.active ? 'Restart tour' : 'Start the guided tour (about 75 s)'}>
-      {g.active ? '↺' : '▶'} <span className="tour-txt">{g.active ? 'Restart tour' : 'Tour'}</span>
+    <button type="button" className={`btn ${g.active ? '' : 'primary'}`} onClick={startGuided} aria-pressed={g.active} aria-label={g.active ? 'Restart tour' : 'Start guided tour'} title={g.active ? 'Restart tour' : 'Start the guided tour (about 75 s)'}>
+      <span aria-hidden="true">{g.active ? '↺' : '▶'}</span> <span className="tour-txt">{g.active ? 'Restart tour' : 'Tour'}</span>
     </button>
   );
 }
@@ -189,11 +192,7 @@ export function GuidedBar() {
       }}
     >
       <span className="label">Tour</span>
-      <span className="tour-dots" aria-hidden="true">
-        {STEPS.map((_, i) => (
-          <i key={i} className={i < g.step ? 'done' : i === g.step ? 'now' : ''} />
-        ))}
-      </span>
+      <span className="tour-count mono" aria-hidden="true">{String(g.step + 1).padStart(2, '0')} / {String(STEPS.length).padStart(2, '0')}</span>
       <span className="sr-only">
         Step {g.step + 1} of {STEPS.length}
       </span>
@@ -211,6 +210,7 @@ export function GuidedBar() {
         </span>
       )}
       <span className="grow" />
+      <a className="tour-explanation" href="#ask" aria-label="Read the tour explanation">Explanation <span aria-hidden="true">↓</span></a>
       <span className="tour-actions">
         <button type="button" className="btn sm ghost" onClick={() => setG({ auto: !g.auto })} aria-pressed={g.auto} title="Advance automatically">
           {g.auto ? '❚❚ Auto' : '▶ Auto'}
@@ -223,8 +223,8 @@ export function GuidedBar() {
         <button type="button" className="btn sm icon" onClick={startGuided} aria-label="Restart tour" title="Restart tour">
           ↺
         </button>
-        <button type="button" className="btn sm icon" onClick={() => setG({ active: false })} aria-label="Exit tour" title="Exit tour">
-          ✕
+        <button type="button" className={`btn sm ${last ? 'primary' : 'icon'}`} onClick={() => setG({ active: false })} aria-label={last ? 'Finish tour' : 'Exit tour'} title={last ? 'Finish tour' : 'Exit tour'}>
+          {last ? 'Finish tour' : '✕'}
         </button>
       </span>
     </div>

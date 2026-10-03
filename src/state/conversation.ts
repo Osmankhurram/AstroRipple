@@ -9,6 +9,7 @@ import { snapshotOf, type InvestigateResponse } from '@/ai/protocol';
 import { computeMetrics } from '@/simulation/metrics';
 import type { WeatherAssessment } from '@/simulation/weather';
 import { store } from './store';
+import { clientToolContext, satRuntime } from './satRuntime';
 
 export type EntryMode = 'live' | 'scripted' | 'guided' | 'fallback';
 
@@ -106,7 +107,7 @@ function revealTime() {
 }
 
 function runScriptedInto(entryId: string, question: string, mode: EntryMode, prefix = '') {
-  const run = runScripted(question, store.get());
+  const run = runScripted(question, store.get(), clientToolContext);
   const receipts: string[] = [];
   for (const o of run.outcomes) {
     receipts.push(o.receipt);
@@ -133,7 +134,8 @@ async function ask(question: string) {
 
   set({ busy: true });
   const requestId = newId();
-  const snapshot = snapshotOf(store.get());
+  const cur = store.get();
+  const snapshot = snapshotOf(cur, satRuntime.snapshot(cur.satellite.catalogId)?.snapshotId ?? null);
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 40_000);
   try {

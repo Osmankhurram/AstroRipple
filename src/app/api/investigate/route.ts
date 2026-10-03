@@ -12,11 +12,15 @@ import { aiConfig } from '@/ai/config';
 import { InvestigateRequestSchema, stateFromSnapshot, type InvestigateResponse, type ToolStep } from '@/ai/protocol';
 import { SYSTEM_PROMPT } from '@/ai/systemPrompt';
 import { templateExplanation } from '@/ai/scripted';
-import { executeTool, summarize, LIMITS, type ToolOutcome } from '@/ai/toolExecutor';
+import { executeTool, summarize, LIMITS, type ToolContext, type ToolOutcome } from '@/ai/toolExecutor';
+import { SAT_LIMITS } from '@/ai/satelliteTools';
 import { TOOL_DEFINITIONS } from '@/ai/toolSchemas';
 import { LAUNCH_SITES } from '@/data/demoMission';
+import { ASCENT_FEASIBILITY_NOTE, TRAJECTORIES } from '@/satellites/ascent';
+import { CATALOGS, type CatalogId, type CatalogSnapshot } from '@/satellites/catalogs';
+import { getCatalogSnapshot, peekCatalogSnapshot } from '@/satellites/server/celestrakCache';
 import { describeThresholds } from '@/simulation/weather';
-import type { InvestigationState } from '@/state/reducer';
+import { screeningUnavailableReason, type InvestigationState } from '@/state/reducer';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -36,8 +40,25 @@ function rateLimited(ip: string) {
   return arr.length > 20;
 }
 
-function scenarioContext(state: InvestigationState) {
+function satelliteContext(state: InvestigationState, snap: CatalogSnapshot | null) {
+  const sat = state.satellite;
+  const traj = TRAJECTORIES[sat.trajectoryId];
+  const sel = snap && sat.selectedKey ? snap.objects.find((o) => o.key === sat.selectedKey) : null;
   return {
+    enabled: sat.enabled,
+    timeSource: sat.timeSource === 'now' ? 'Now — estimated positions' : 'Scenario time — predicted positions',
+    screeningSet: { catalogId: sat.catalogId, label: CATALOGS[sat.catalogId].label, synthetic: CATALOGS[sat.catalogId].synthetic, loadedObjects: snap?.objects.length ?? null, dataStatus: snap?.status ?? 'not loaded', fetchedAtUtc: snap?.fetchedAtUtc ?? null, elementEpochRange: snap?.epochRange ?? null },
+    selectedObject: sel ? { name: sel.name, key: sel.key } : null,
+    screeningDistanceKm: sat.thresholdKm,
+    trajectory: traj ? { id: traj.id, label: traj.label, provenance: traj.provenance, frame: traj.frame, validitySeconds: traj.validitySeconds, delayModel: traj.delayModel, note: ASCENT_FEASIBILITY_NOTE } : null,
+    screeningUnavailable: screeningUnavailableReason(state),
+    rules: [SAT_LIMITS.noCollisionProbability, SAT_LIMITS.crossing, SAT_LIMITS.estimates, SAT_LIMITS.coverage],
+  };
+}
+
+function scenarioContext(state: InvestigationState, snap: CatalogSnapshot | null = null) {
+  return {
+    satelliteMode: satelliteContext(state, snap),
     mission: { id: state.mission.id, name: state.mission.name, fictional: true, launchSite: LAUNCH_SITES[state.mission.defaultSiteId].name },
     suppliedWindows: state.mission.windows.map((w) => ({ id: w.id, label: w.label, startUtc: w.startUtc, endUtc: w.endUtc, provenance: w.provenance })),
     baseline: summarize(state, state.baseline),
@@ -70,6 +91,24 @@ export async function POST(req: Request) {
   if (!rebuilt.ok) return NextResponse.json({ error: `Invalid snapshot: ${rebuilt.error}` }, { status: 400 });
   let working = rebuilt.state;
 
+  // Satellite tools compute on the SAME catalog snapshot the browser loaded (matched by snapshot id).
+  const satSnap = snapshot.satellite;
+  const wantsSatellite = !!satSnap?.enabled || /satell|\biss\b|station|starlink|closest|proximity|encounter|collid|collision|debris/i.test(question);
+  let currentSnap: CatalogSnapshot | null = null;
+  if (satSnap?.snapshotId) currentSnap = peekCatalogSnapshot(satSnap.catalogId as CatalogId, satSnap.snapshotId);
+  if (!currentSnap && wantsSatellite) {
+    try {
+      const fresh = await getCatalogSnapshot(working.satellite.catalogId);
+      // A browser that already holds a different snapshot must not get numbers for another object list.
+      if (!satSnap?.snapshotId || fresh.snapshotId === satSnap.snapshotId) currentSnap = fresh;
+    } catch {
+      currentSnap = null;
+    }
+  }
+  const toolCtx: ToolContext = {
+    getSnapshot: (id) => (id === working.satellite.catalogId && currentSnap?.catalogId === id ? currentSnap : satSnap?.snapshotId && id === satSnap.catalogId ? null : peekCatalogSnapshot(id)),
+  };
+
   const client = new Anthropic({ timeout: 30_000, maxRetries: 1 });
 
   // History is text-only and must start with a user turn.
@@ -82,7 +121,7 @@ export async function POST(req: Request) {
     ...prior,
     {
       role: 'user',
-      content: `<scenario_state>\n${JSON.stringify(scenarioContext(working), null, 1)}\n</scenario_state>\n\n<question>\n${question}\n</question>`,
+      content: `<scenario_state>\n${JSON.stringify(scenarioContext(working, currentSnap), null, 1)}\n</scenario_state>\n\n<question>\n${question}\n</question>`,
     },
   ];
 
@@ -132,7 +171,7 @@ export async function POST(req: Request) {
           truncated = true;
           continue;
         }
-        const o = executeTool(working, tu.name, tu.input);
+        const o = executeTool(working, tu.name, tu.input, toolCtx);
         outcomes.push(o);
         steps.push({ tool: tu.name, ok: o.ok, receipt: o.receipt, actions: o.ok ? o.actions : [], input: o.ok ? (tu.input as Record<string, unknown>) : undefined });
         if (o.ok) working = o.state;

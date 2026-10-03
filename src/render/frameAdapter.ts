@@ -27,3 +27,15 @@ export function threeToSim(v: THREE.Vector3): Vec3 {
 export function planeMatrix(e1: Vec3, e2: Vec3, n: Vec3, target = new THREE.Matrix4()): THREE.Matrix4 {
   return target.makeBasis(simToThree(e1), simToThree(e2), simToThree(n));
 }
+
+/**
+ * Earth-fixed (ECF) kilometres → three.js units inside the Earth-fixed group. The globe mesh has unit
+ * radius, so 1 scene unit = SCENE_KM_PER_UNIT km (mean Earth radius). Visual only: marker sizes and
+ * scene units are NEVER used for proximity calculations, which stay in physical km.
+ */
+export const SCENE_KM_PER_UNIT = 6371;
+
+export function ecfKmToScene(v: readonly [number, number, number], target = new THREE.Vector3()): THREE.Vector3 {
+  const k = 1 / SCENE_KM_PER_UNIT;
+  return simToThree([v[0] * k, v[1] * k, v[2] * k], target);
+}

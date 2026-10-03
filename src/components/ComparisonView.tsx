@@ -9,6 +9,9 @@ import { IconOverview, IconPlane, IconSite } from './icons';
 import { ANGLE_DISCLAIMER } from './ResultStrip';
 import { COLORS } from './sceneColors';
 import { InfoTip, Popover, useMediaQuery, useTransitioning, useTween } from './ui';
+import { SatelliteToggle, SatelliteToolbar, SatPaneHud } from './satellite/SatelliteControls';
+import { LABELS, SAT_COLORS } from './satellite/satUi';
+import { paneLaunchEpochMs } from './satellite/paneTime';
 
 const GlobeCanvas = dynamic(() => import('./GlobeScene').then((m) => m.GlobeCanvas), {
   ssr: false,
@@ -50,10 +53,12 @@ function Schematic({ which }: { which: ScenarioId }) {
 
 function Hud({ which, showScale }: { which: ScenarioId; showScale: boolean }) {
   const st = useInvestigation();
+  const satMode = st.satellite.enabled;
   const sc = which === 'baseline' ? st.baseline : st.experiment;
   const m = computeMetrics(sc, st.baseline, st.mission, st.view.playbackOffsetSec);
   const angle = useTween(m.siteToPlaneAngleDeg, !st.view.reducedMotion, 1150);
-  const d = new Date(sc.launchTimeUtc);
+  // In Satellite Mode the header shows the launch epoch actually screened (demonstration epoch for synthetic data).
+  const d = new Date(satMode ? paneLaunchEpochMs(st, which) : Date.parse(sc.launchTimeUtc));
   const pad = (x: number) => String(x).padStart(2, '0');
   const hypothetical = which === 'experiment' && m.offsetMinutes !== 0;
   return (
@@ -74,7 +79,8 @@ function Hud({ which, showScale }: { which: ScenarioId; showScale: boolean }) {
           </span>
         </div>
       </div>
-      <div className="hud bl">
+      {satMode && <SatPaneHud which={which} />}
+      <div className="hud bl" hidden={satMode}>
         <div className="hud-angle">
           <span className="num" aria-hidden="true">
             ∠ {angle.toFixed(1)}°
@@ -83,10 +89,18 @@ function Hud({ which, showScale }: { which: ScenarioId; showScale: boolean }) {
           <InfoTip label="About the site-to-plane angle">{ANGLE_DISCLAIMER}</InfoTip>
         </div>
       </div>
-      {showScale && (
+      {showScale && !satMode && (
         <div className="hud br">
           <span className="label plain">Not to scale</span>
           <InfoTip label="About scale">Orbit altitude exaggerated ×3. Lighting and frame orientation are illustrative.</InfoTip>
+        </div>
+      )}
+      {showScale && satMode && (
+        <div className="hud br">
+          <span className="label plain">{LABELS.notToScale}</span>
+          <InfoTip label="About Satellite Mode scale">
+            Satellite markers are enlarged for visibility and never used in calculations. Satellites and the ascent are drawn at true altitude (km) on a unit-radius Earth; Earth’s orientation follows sidereal time (GMST) at the displayed instant. The illustrative target plane is hidden in Satellite Mode.
+          </InfoTip>
         </div>
       )}
     </>
@@ -111,7 +125,44 @@ function Pane({ which, active, webgl, differs, showScale }: { which: ScenarioId;
   );
 }
 
+function SatLegend() {
+  return (
+    <div className="legend" aria-label="Satellite legend">
+      <span>
+        <i className="sw dot" style={{ background: SAT_COLORS.object }} /> Cataloged object (estimated)
+      </span>
+      <span>
+        <i className="sw" style={{ background: COLORS.baseline }} /> Baseline ascent
+      </span>
+      <span>
+        <i className="sw" style={{ background: COLORS.experiment }} /> Experiment ascent
+      </span>
+      <span style={{ color: SAT_COLORS.approach }}>◆ {LABELS.approach}</span>
+      <span className="grow" />
+      <Popover label="More ▾" className="btn sm ghost" ariaLabel="More satellite legend items">
+        <ul className="key-list">
+          <li>
+            <i className="sw dot" style={{ background: SAT_COLORS.selected }} /> ◎ Selected object (large marker)
+          </li>
+          <li>
+            <i className="sw dot" style={{ background: SAT_COLORS.synthetic }} /> Synthetic, fictional object
+          </li>
+          <li>
+            <i className="sw dash" /> Trail: path relative to Earth’s surface, ±½ orbit (dashed = past)
+          </li>
+          <li>
+            <span style={{ width: 22, textAlign: 'center', color: SAT_COLORS.approach }}>┅</span> Separation connector (same instant, km)
+          </li>
+        </ul>
+        <div className="foot-note">{LABELS.notToScale} · positions are SGP4 estimates, not telemetry</div>
+      </Popover>
+    </div>
+  );
+}
+
 function Legend() {
+  const st = useInvestigation();
+  if (st.satellite.enabled) return <SatLegend />;
   return (
     <div className="legend" aria-label="Legend">
       <span>
@@ -172,42 +223,45 @@ export function ComparisonView() {
   ];
 
   return (
-    <section className="card stage" aria-label="Globe comparison">
-      <div className="stage-toolbar">
-        {tour ? (
-          <GuidedBar />
-        ) : (
-          <>
-            <div className="seg" role="radiogroup" aria-label="View">
-              {options.map((o) => (
-                <button
-                  key={o.v}
-                  type="button"
-                  role="radio"
-                  aria-checked={selected === o.v}
-                  style={{ ['--seg-c' as string]: o.c } as React.CSSProperties}
-                  onClick={() => choose(o.v)}
-                >
-                  <i className="led" style={{ ['--c' as string]: o.c } as React.CSSProperties} />
-                  {o.label}
-                </button>
-              ))}
-            </div>
-            <span className="grow" />
-            <div className="cam-btns" role="group" aria-label="Camera">
-              <button type="button" className="btn sm" onClick={() => store.dispatch({ type: 'FOCUS', target: 'overview' })} aria-label="Overview" title="Overview">
-                <IconOverview /> <span className="txt">Overview</span>
-              </button>
-              <button type="button" className="btn sm" onClick={() => store.dispatch({ type: 'FOCUS', target: 'launch-site' })} aria-label="Focus launch site" title="Focus launch site">
-                <IconSite /> <span className="txt">Launch site</span>
-              </button>
-              <button type="button" className="btn sm" onClick={() => store.dispatch({ type: 'FOCUS', target: 'orbital-plane' })} aria-label="View orbital plane" title="View the orbital plane edge-on">
-                <IconPlane /> <span className="txt">Orbit plane</span>
-              </button>
-            </div>
-          </>
-        )}
+    <section className="card stage" id="orbital-view" aria-label="Globe comparison">
+      <div className="section-heading">
+        <h2><span className="section-index">01</span> Orbital view</h2>
+        <span className="scene-hint">Drag to rotate <span>·</span> Scroll to zoom</span>
       </div>
+      {tour && <GuidedBar />}
+      <div className="stage-toolbar">
+        <div className="seg" role="radiogroup" aria-label="View">
+          {options.map((o) => (
+            <button
+              key={o.v}
+              type="button"
+              role="radio"
+              aria-checked={selected === o.v}
+              style={{ ['--seg-c' as string]: o.c } as React.CSSProperties}
+              onClick={() => choose(o.v)}
+            >
+              <i className="led" style={{ ['--c' as string]: o.c } as React.CSSProperties} />
+              {o.label}
+            </button>
+          ))}
+        </div>
+        <SatelliteToggle />
+        <span className="grow" />
+        <div className="cam-btns" role="group" aria-label="Camera">
+          <button type="button" className="btn sm" onClick={() => store.dispatch({ type: 'FOCUS', target: 'overview' })} aria-label="Overview" title="Overview">
+            <IconOverview /> <span className="txt">Overview</span>
+          </button>
+          <button type="button" className="btn sm" onClick={() => store.dispatch({ type: 'FOCUS', target: 'launch-site' })} aria-label="Focus launch site" title="Focus launch site">
+            <IconSite /> <span className="txt">Launch site</span>
+          </button>
+          {!st.satellite.enabled && (
+            <button type="button" className="btn sm" onClick={() => store.dispatch({ type: 'FOCUS', target: 'orbital-plane' })} aria-label="View orbital plane" title="View the orbital plane edge-on">
+              <IconPlane /> <span className="txt">Orbit plane</span>
+            </button>
+          )}
+        </div>
+      </div>
+      {st.satellite.enabled && <SatelliteToolbar />}
       <div className={`panes n${panes.length}`}>
         {(['baseline', 'experiment'] as ScenarioId[]).map((w) => (
           <Pane key={w} which={w} active={panes.includes(w)} webgl={webgl} differs={differs} showScale={w === lastPane} />
