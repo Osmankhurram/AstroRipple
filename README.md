@@ -53,9 +53,9 @@ No keys or accounts are required, and the core demo works offline.
 | `LD_SATELLITE_CACHE_DIR` | Where the CelesTrak cache persists (default `.cache/celestrak`) |
 
 ```bash
-npm test               # 137 unit/integration tests (vitest)
+npm test               # 140 unit/integration tests (vitest)
 npm run typecheck
-npm run e2e            # 67 browser checks against a running app (see e2e/README.md)
+npm run e2e            # 68 browser checks against a running app (see e2e/README.md)
 ```
 
 ## What's inside
@@ -71,7 +71,8 @@ npm run e2e            # 67 browser checks against a running app (see e2e/README
   actions as the manual controls, and only if the scenario hasn't changed in the meantime.
 - **◉ Best view**: where to watch the launch — a spot on land with a side-on view of the climb, the
   direction to look, and a Good / Fair / Poor rating from the launch-time weather.
-- **Satellite Mode**: real CelesTrak objects at SGP4-estimated positions, with search, follow,
+- **Satellite Mode**: every active LEO satellite (~15,800, all around the globe) from CelesTrak at
+  SGP4-estimated positions, with search, follow,
   trails and an above-horizon filter. *Launch proximity screening* compares an illustrative ascent
   with every screened object for the baseline and a delayed experiment, with replay, a distance
   chart and a close-up.

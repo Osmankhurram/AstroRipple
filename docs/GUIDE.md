@@ -107,12 +107,13 @@ delay, Earth rotation vs. angle, the two windows' weather, and a polar orbit. It
 steps with **Next**.
 
 ### Satellite Mode 🛰
-Turn it on from the globe toolbar. A second toolbar row appears:
+Turn it on from the globe toolbar. It opens on **every active LEO satellite** (about 15,800), so you
+see satellites all around the globe; drag to rotate and see the far side. A second toolbar row appears:
 
 | Control | What it does |
 |---|---|
 | **Now / Scenario** | **Now — estimated positions**: satellites at the current UTC time. **Scenario time — predicted positions**: each globe at *its own* launch time plus elapsed time, so you can compare baseline and experiment. |
-| **Screening set** | What is loaded *and* screened: Stations · LEO sample · 250 · All active LEO (heavy) · Synthetic demo (fictional). |
+| **Screening set** | What is shown *and* screened: **All active LEO** (default, the whole globe) · Stations · LEO sample · 250 · Synthetic demo (fictional). |
 | **Search** | Find by name or NORAD ID (e.g. "ISS" or 25544), or click a dot on the globe. |
 | **Display ▾** | Trails and the **Above horizon** filter. Display filters never change what is screened. |
 | **Source** | Where the data came from (live / cached / bundled fixture), when it was fetched, element epochs and record counts. |

@@ -28,9 +28,9 @@ summarised alongside the rest of the system in [SYSTEM_DESIGN.md](SYSTEM_DESIGN.
 
 | Preset (toolbar label) | Upstream | Selection |
 |---|---|---|
+| All active LEO satellites (All active LEO) — **default** | `GROUP=active` | every LEO record (~15.8k): satellites all around the globe |
 | Space stations (Stations) | `GROUP=stations` | all valid records (23 on 2026‑10‑03) |
-| Active LEO sample (LEO sample · 250) | `GROUP=active` | LEO = MEAN_MOTION ≥ 11.25 rev/day and e < 0.25; sorted by NORAD id; 250 evenly spaced |
-| All active LEO (All active LEO) | `GROUP=active` (same download) | every LEO record (~15.8k) |
+| Active LEO sample (LEO sample · 250) | `GROUP=active` (same download) | LEO = MEAN_MOTION ≥ 11.25 rev/day and e < 0.25; sorted by NORAD id; 250 evenly spaced |
 | Synthetic encounter demo (Synthetic demo) | none | four fictional objects (see below) |
 
 Display filters (search, "Above horizon") never change the screening set, and the UI says so.

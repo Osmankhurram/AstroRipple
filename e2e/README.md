@@ -15,7 +15,7 @@ npm run e2e
 |---|---|
 | `lab.mjs` | Countdown, weather popovers, view switch, camera presets, legend, Best view, playback (play, speed, scrub, reset), timing slider/steppers/shortcuts/keyboard, orbit presets, launch site, undo/reset, display options, hover descriptions |
 | `assistant.mjs` | Ask panel chips and typed questions (Scripted mode), action chips, Reset all, guide sheet, guided tour, real-world feed |
-| `satellites.mjs` | Satellite Mode: catalogs, data source, search/select/follow, trails, time source, screening (real sample + synthetic), replay, close-up, stale results, transport markers, synthetic tour, satellite chips |
+| `satellites.mjs` | Satellite Mode: whole-globe default set, catalogs, data source, search/select/follow, trails, time source, screening (real sample + synthetic), replay, close-up, stale results, transport markers, synthetic tour, satellite chips |
 | `layout.mjs` | No horizontal overflow from 1920 px to 390 px; phone essentials; three-column layout on wide screens |
 
 Environment: `APP_URL` (default `http://localhost:3000`) and `CDP_PORT` (default `9223`). A check

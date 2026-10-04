@@ -6,6 +6,7 @@
  * actual tool results. Anything else gets a clear "supported actions" message.
  */
 import { executeTool, type ToolContext, type ToolOutcome, type ToolResultPayload } from './toolExecutor';
+import { isSynthetic, type CatalogId } from '../satellites/catalogs';
 import type { InvestigationState } from '../state/reducer';
 import { RESULT_DISCLAIMER, fmtKm } from '../satellites/screening';
 import { LAUNCH_SITES } from '../data/demoMission';
@@ -24,8 +25,17 @@ export const SUPPORTED_HELP =
 
 const TRAJ = 'illustrative-florida-ne';
 
+const ISS_NORAD = 25544;
+
+/** Does the selected screening set contain the ISS? Uses the loaded snapshot when there is one. */
+function setHasIss(catalogId: CatalogId, ctx?: ToolContext): boolean {
+  const snap = ctx?.getSnapshot(catalogId);
+  if (snap) return snap.objects.some((o) => !isSynthetic(o) && o.noradId === ISS_NORAD);
+  return catalogId === 'stations' || catalogId === 'active-leo'; // live data for both includes it
+}
+
 /** Satellite Mode intents (checked before the generic delay parser when the question is about satellites). */
-export function planSatellite(s: string, state: InvestigationState): PlannedCall[] | null {
+export function planSatellite(s: string, state: InvestigationState, ctx?: ToolContext): PlannedCall[] | null {
   const sat = state.satellite;
   const about = /\b(satellites?|iss|space station|starlink|close approach|closest|proximity|encounter|collid|collision|crash|hit|debris|screen)/.test(s) || sat.enabled;
   if (!about) return null;
@@ -38,8 +48,9 @@ export function planSatellite(s: string, state: InvestigationState): PlannedCall
   if (/\b(iss|space station|zarya)\b/.test(s)) {
     const calls: PlannedCall[] = [];
     if (!sat.enabled) calls.push({ name: 'set_satellite_mode', input: { enabled: true } });
-    if (sat.catalogId !== 'stations') calls.push({ name: 'set_screening_catalog', input: { catalogId: 'stations' } });
-    calls.push({ name: 'select_satellite', input: { noradId: 25544, follow: /\b(follow|track)\b/.test(s) } });
+    // Stay on the current set (e.g. all active LEO, so the globe stays full) when it holds the ISS.
+    if (!setHasIss(sat.catalogId, ctx)) calls.push({ name: 'set_screening_catalog', input: { catalogId: 'stations' } });
+    calls.push({ name: 'select_satellite', input: { noradId: ISS_NORAD, follow: /\b(follow|track)\b/.test(s) } });
     return calls;
   }
   if (/(slow motion|slowly|replay|that encounter|show me (the|that) (approach|encounter))/.test(s)) {
@@ -91,9 +102,9 @@ export function parseOffset(q: string): { minutes: number; relativeTo: 'baseline
   return { minutes, relativeTo: incremental ? 'experiment' : 'baseline' };
 }
 
-export function planScripted(question: string, state: InvestigationState): PlannedCall[] | null {
+export function planScripted(question: string, state: InvestigationState, ctx?: ToolContext): PlannedCall[] | null {
   const s = question.toLowerCase();
-  const satPlan = planSatellite(s, state);
+  const satPlan = planSatellite(s, state, ctx);
   if (satPlan) return satPlan;
   if (/\b(reset|start over|back to (the )?(original|baseline))\b/.test(s)) return [{ name: 'reset_experiment', input: {} }];
   if (/window/.test(s) && /\b(compare|two|both|backup|window b|supplied|other)\b/.test(s))
@@ -206,11 +217,14 @@ export interface ScriptedRun {
   understood: boolean;
 }
 
+/** Tools that only prepare the scene for the actual answer. */
+const SETUP_TOOLS = new Set(['set_satellite_mode', 'set_screening_catalog', 'set_satellite_time_source']);
+
 /** Calculations this model deliberately cannot do — answered honestly rather than "not understood". */
 const UNSUPPORTED = /\b(fuel|propellant|delta[- ]?v|payload|cost|price|success|odds|probabilit\w*|chance)\b/;
 
 export function runScripted(question: string, state: InvestigationState, ctx?: ToolContext): ScriptedRun {
-  const plan = planScripted(question, state);
+  const plan = planScripted(question, state, ctx);
   if (!plan) {
     const explanation = UNSUPPORTED.test(question.toLowerCase())
       ? "This model can't compute that in scripted demo mode: it shows launch geometry, demo weather and estimated satellite positions, not fuel, cost or success odds."
@@ -224,5 +238,8 @@ export function runScripted(question: string, state: InvestigationState, ctx?: T
     outcomes.push(o);
     if (o.ok) s = o.state;
   }
-  return { plan, outcomes, explanation: outcomes.map(templateExplanation).join(' '), understood: true };
+  // Lead with what was asked for (e.g. the ISS selection); setup steps (mode, set, clock) follow.
+  const main = outcomes.filter((o) => !SETUP_TOOLS.has(o.name));
+  const ordered = main.length ? [...main, ...outcomes.filter((o) => SETUP_TOOLS.has(o.name))] : outcomes;
+  return { plan, outcomes, explanation: ordered.map(templateExplanation).join(' '), understood: true };
 }

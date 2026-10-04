@@ -5,7 +5,7 @@
 import { buildDemoMission, LAUNCH_SITES, type Mission } from '../data/demoMission';
 import type { OrbitPreset } from '../simulation/orbits';
 import { ILLUSTRATIVE_ASCENT, TRAJECTORIES } from '../satellites/ascent';
-import { CATALOGS, type CatalogId } from '../satellites/catalogs';
+import { CATALOGS, DEFAULT_CATALOG, type CatalogId } from '../satellites/catalogs';
 import { SCREENING_LIMITS } from '../satellites/screening';
 import {
   cloneAsExperiment,
@@ -162,7 +162,7 @@ export function initialSatelliteState(): SatelliteState {
   return {
     enabled: false,
     timeSource: 'now',
-    catalogId: 'stations',
+    catalogId: DEFAULT_CATALOG,
     selectedKey: null,
     follow: false,
     trails: 'selected',

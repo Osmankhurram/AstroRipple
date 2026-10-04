@@ -11,7 +11,9 @@ export type SatObject = OrbitalRecord | SyntheticRecord;
 export const isSynthetic = (o: SatObject): o is SyntheticRecord => o.synthetic === true;
 
 export type CatalogId = 'stations' | 'active-sample' | 'active-leo' | 'synthetic-demo';
-export const CATALOG_IDS: readonly CatalogId[] = ['stations', 'active-sample', 'active-leo', 'synthetic-demo'] as const;
+/** Dropdown order; the first is Satellite Mode's default (every active LEO satellite, all around the globe). */
+export const CATALOG_IDS: readonly CatalogId[] = ['active-leo', 'stations', 'active-sample', 'synthetic-demo'] as const;
+export const DEFAULT_CATALOG: CatalogId = 'active-leo';
 
 export const CELESTRAK_GP = 'https://celestrak.org/NORAD/elements/gp.php';
 export const celestrakGroupUrl = (group: string) => `${CELESTRAK_GP}?GROUP=${encodeURIComponent(group)}&FORMAT=JSON`;
@@ -28,7 +30,7 @@ export interface CatalogDef {
   upstreamGroup: 'stations' | 'active' | null;
   description: string;
   synthetic: boolean;
-  /** Explicit, heavier action (not loaded by default). */
+  /** Large set (several MB, loaded once; screening clears most objects with the radial bound). */
   broad: boolean;
 }
 
@@ -53,10 +55,10 @@ export const CATALOGS: Record<CatalogId, CatalogDef> = {
   },
   'active-leo': {
     id: 'active-leo',
-    label: 'All active LEO (broad)',
+    label: 'All active LEO satellites',
     short: 'All active LEO',
     upstreamGroup: 'active',
-    description: "Every LEO object (≥ 11.25 rev/day, e < 0.25) in CelesTrak's 'active' group. Heavier: loads several MB and uses a conservative radial bound during screening.",
+    description: "Every LEO object (≥ 11.25 rev/day, e < 0.25) in CelesTrak's 'active' group: satellites all around the globe. Loads once (a few MB, cached on the server); screening uses a conservative radial bound.",
     synthetic: false,
     broad: true,
   },

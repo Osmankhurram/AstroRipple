@@ -55,7 +55,7 @@ during an investigation; every control and tool edits only the experiment copy.
 | Target orbital planes | Constructed from three presets so each plane passes over the site at the baseline time | Illustrative | On orbit change | `src/simulation/orbits.ts`, `scenario.ts` |
 | Earth rotation, site-to-plane angle | Computed (sidereal rate, GMST-aligned frame) | Computed | On every change / playback frame | `src/simulation/coordinates.ts`, `metrics.ts` |
 | Best view (where to watch) | Computed from the illustrative ascent, a coastline land mask and the demo weather | Computed | Per scenario, cached | `src/satellites/viewing.ts` |
-| Cataloged satellites | **CelesTrak GP data** (OMM JSON) through a shared server cache; bundled snapshot offline | **Real** public orbital elements | At most once per ~2 h per group | `src/satellites/server/celestrakCache.ts` |
+| Cataloged satellites | **CelesTrak GP data** (OMM JSON) through a shared server cache; bundled snapshot offline. Satellite Mode opens on every active LEO satellite, all around the globe | **Real** public orbital elements | At most once per ~2 h per group | `src/satellites/server/celestrakCache.ts` |
 | Satellite positions | SGP4 propagation of those elements (satellite.js) | Estimated, not telemetry | ~1 Hz ("Now") / ~4 Hz (playback), interpolated per frame | `src/satellites/propagation.ts` |
 | Rocket ascent | Analytic profile | **Illustrative** | Static | `src/satellites/ascent.ts` |
 | Close approaches | Screening: rocket vs. every screened object at the same instants | Computed | On "Analyze" | `src/satellites/screening.ts` |
@@ -380,10 +380,12 @@ time, so AI tool calls run against exactly what the visitor sees.
   REV_AT_EPOCH`. `EPOCH` (no zone suffix) is parsed as UTC; NORAD ids above 99999 are kept.
 - **Validation:** records missing any SGP4 field are rejected with a reason (never filled in);
   duplicates are merged by NORAD id.
-- **Screening sets:** *Stations* = the whole `stations` group (23 objects on 2026-10-03);
-  *LEO sample · 250* = 250 objects evenly spaced by catalog number among LEO records of `active`
-  (LEO = mean motion ≥ 11.25 rev/day and e < 0.25); *All active LEO* = every such record (~15.8k,
-  heavier); *Synthetic demo* = SYN-A…D. Search and display filters never change the screening set.
+- **Screening sets:** *All active LEO* (the default) = every LEO record of `active` (LEO = mean
+  motion ≥ 11.25 rev/day and e < 0.25): ~15.8k satellites all around the globe, ~6 MB loaded once;
+  *Stations* = the whole `stations` group (23 objects on 2026-10-03); *LEO sample · 250* = 250 of the
+  LEO records, evenly spaced by catalog number (screens in ~1 s); *Synthetic demo* = SYN-A…D. Offline,
+  *All active LEO* comes from the 250-object fixture. Search and display filters never change the
+  screening set.
 - **Provider policy:** GP data updates about every two hours and should be downloaded once per
   update, so the browser never calls CelesTrak. The server keeps **one shared cache per group**
   (the two `active` sets share one download), refreshes no sooner than **2 h** after the last success,
@@ -485,6 +487,9 @@ scripted path answers instead and the scene is never left half-changed.
 The browser requests `/api/satellites?catalog=…`; the server answers from its cache unless a refresh
 is due (§5.2). The browser hands the objects to a Web Worker, which builds SGP4 satrecs once and
 returns transferable `Float32Array` position buffers on request; the scene interpolates them per frame.
+Scripted answers run their tools synchronously, so before a satellite question is answered the
+browser fetches the sets it needs (the current one, plus Stations for ISS requests) without changing
+what the globe shows; "find the ISS" stays on the whole-globe set when that set contains it.
 
 ### 7.3 Screening
 
@@ -519,6 +524,7 @@ screening on the server against the same snapshot (matched by snapshot id), so b
 | 16 | Progressive disclosure: one shared hover description (`HoverTips`) plus ⓘ popovers | Short labels on screen, details on demand; native `title` hints upgraded automatically | Hover isn't available on touch (ⓘ still is) |
 | 17 | Own screen-space label component (`SceneHtml`) instead of drei `<Html>` | drei re-targeted every label after R3F connected its events, unmounting React roots mid-commit (console errors in production) | Supports only the subset of options the app uses |
 | 18 | Real-world feed on by default, fetched only on demand | Works out of the box without network traffic on page load | First "Load" waits for two external APIs |
+| 19 | Satellite Mode opens on every active LEO satellite (whole globe) | The first view shows the real population around Earth, not a handful of station objects | ~6 MB first load (cached afterwards); analysing the full set takes ~6 s (the 250 sample ~1 s) |
 
 ---
 
@@ -591,12 +597,12 @@ rate limiter.
 
 ## 12 · Testing
 
-- **Unit and integration tests** (`npm test`, vitest, 137 tests): SGP4 against Vallado's reference
+- **Unit and integration tests** (`npm test`, vitest, 140 tests): SGP4 against Vallado's reference
   case; UTC parsing, frames and units; plane construction and the site-to-plane angle; weather rules
   and edge cases; screening (refinement, endpoints, multiple minima, crossing paths, altitude);
   staleness and cancellation; the CelesTrak cache policy (coalescing, hold, no redirects); manual ≡ AI
   parity; the investigate route with a mocked SDK; scripted parsing and answer formatting.
-- **Browser checks** (`npm run e2e`, see [`e2e/README.md`](../e2e/README.md)): 67 end-to-end checks
+- **Browser checks** (`npm run e2e`, see [`e2e/README.md`](../e2e/README.md)): 68 end-to-end checks
   that drive the running app over the Chrome DevTools Protocol — every control, the Ask panel, tours,
   Satellite Mode and screening, the real-world feed, and layouts from 1920 px to 390 px. A check also
   fails if the page logs a console error while it runs.

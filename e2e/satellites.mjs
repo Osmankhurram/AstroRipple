@@ -7,8 +7,12 @@ const settled = `[...document.querySelectorAll('.msg.assistant')].pop() && ![...
 
 await step('turn on: toolbar, catalog, screening panel', async () => {
   await click('.sat-toggle');
-  await until(ready, 30000);
+  await until(ready, 60000);
   await until("document.querySelector('.prox')");
+});
+await step('opens on every active LEO satellite (whole globe)', async () => {
+  const set = await ev("document.querySelector('#sat-cat').value");
+  if (set !== 'active-leo') throw new Error('default set is ' + set);
 });
 await step('data source popover', async () => {
   await click('[aria-label="Satellite data source and epochs"]');
@@ -17,6 +21,13 @@ await step('data source popover', async () => {
 });
 await step('search ISS → select → card → follow → clear', async () => {
   await setInput('#sat-q', 'ISS');
+  await until("document.querySelector('.sat-results button') || document.querySelector('.sat-results .none')");
+  if (await ev("!document.querySelector('.sat-results button')")) {
+    // Offline fixture: the whole-globe set is the 250-object sample, which has no ISS.
+    await setInput('#sat-cat', 'stations');
+    await until(ready, 30000);
+    await setInput('#sat-q', 'ISS');
+  }
   await until("document.querySelector('.sat-results button')");
   await click('.sat-results button');
   await until("document.querySelector('.sat-card')");

@@ -13,6 +13,7 @@ import { DEFAULT_SETTINGS, type ScenarioInput } from '@/satellites/screening';
 import { SatEngine } from '@/satellites/worker/engine';
 import type { Pane, WorkerIn, WorkerOut } from '@/satellites/worker/protocol';
 import { IDLE_RUN, acceptWorkerMessage, cancelRun, startRun, type RunState } from './screeningRuns';
+import { store } from './store';
 
 export interface CatalogEntry {
   status: 'loading' | 'ready' | 'error';
@@ -120,19 +121,31 @@ export const satRuntime = {
     return () => ls.delete(l);
   },
 
-  /** Load a catalog once (shared by both panes). `refresh` asks the server again; it answers from cache unless policy allows a download. */
+  /** Load a catalog once (shared by both panes) and show it. `refresh` asks the server again; it answers from cache unless policy allows a download. */
   ensureCatalog(id: CatalogId, refresh = false): Promise<void> {
     const cur = rs.catalogs[id];
     if (!refresh && cur && cur.status !== 'error') {
       if (cur.snapshot) loadIntoWorker(cur.snapshot);
       return pending.get(id) ?? Promise.resolve();
     }
+    return satRuntime.fetchCatalog(id, true);
+  },
+
+  /**
+   * Fetch a catalog snapshot into the cache without changing what the globe shows (used before
+   * scripted tool calls, which run synchronously against loaded snapshots). `show` also loads it
+   * into the worker once it arrives.
+   */
+  fetchCatalog(id: CatalogId, show = false): Promise<void> {
+    const cur = rs.catalogs[id];
+    if (!show && cur?.status === 'ready') return Promise.resolve();
     if (pending.has(id)) return pending.get(id)!;
     set({ catalogs: { ...rs.catalogs, [id]: { status: 'loading', snapshot: cur?.snapshot ?? null, error: null } } });
     const p = fetchSnapshot(id)
       .then((snap) => {
         set({ catalogs: { ...rs.catalogs, [id]: { status: 'ready', snapshot: snap, error: null } } });
-        loadIntoWorker(snap);
+        // Show it if requested, or if it is the set the user has selected meanwhile.
+        if (show || store.get().satellite.catalogId === id) loadIntoWorker(snap);
       })
       .catch((e: Error) => {
         set({ catalogs: { ...rs.catalogs, [id]: { status: 'error', snapshot: cur?.snapshot ?? null, error: e.message } } });

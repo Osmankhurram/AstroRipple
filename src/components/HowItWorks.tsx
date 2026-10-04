@@ -107,7 +107,7 @@ export function HowItWorks() {
         <ul>
           <li><strong>Now — estimated positions</strong>: cataloged objects (CelesTrak public orbital elements) propagated with SGP4 to the current UTC time. Estimates, not live telemetry; markers are enlarged and not to scale.</li>
           <li><strong>Scenario time — predicted positions</strong>: each globe shows its own launch time plus the elapsed time, so baseline and experiment can be compared side by side.</li>
-          <li><strong>Screening set</strong>: the loaded objects (stations, a 250-object LEO sample, all active LEO, or the fictional synthetic demo). Search and “Above horizon” only change what is drawn, never what is screened.</li>
+          <li><strong>Screening set</strong>: the loaded objects — every active LEO satellite by default (about 15,800, all around the globe), or the space stations, a 250-object LEO sample, or the fictional synthetic demo. Search and “Above horizon” only change what is drawn, never what is screened.</li>
           <li><strong>Analyze launch proximity</strong>: compares an illustrative ascent with every screened object at the same instants and lists any <em>potential close approach</em> inside the chosen demonstration distance (default 25 km).</li>
           <li>A delay re-flies the same Earth-fixed ascent later; the objects have moved on, so different ones may come near. That is not a safety improvement, and a close approach is not a collision prediction.</li>
           <li>No collision probability or launch-safety verdict is ever given: that would need uncertainty data this model does not have.</li>
