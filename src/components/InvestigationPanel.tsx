@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
+import { parseAnswer } from '@/ai/answerText';
 import { conversation, useConversation, type Entry } from '@/state/conversation';
 import type { HighlightTarget } from '@/state/reducer';
 import { store, useInvestigation } from '@/state/store';
@@ -20,25 +21,6 @@ export const SAT_SUGGESTIONS = [
   { label: '+10 min delay', icon: '+10', q: 'Compare the original launch with a ten-minute delay.' },
   { label: 'Will it collide?', icon: '?', q: 'Will it collide?' },
 ];
-
-/** Split "Changed: … Observed: … Meaning: … Limit: …" answers; fall back to sentences. */
-export function parseAnswer(text: string): { lead: string; rest: string[]; limit?: string } {
-  const parts: Record<string, string> = {};
-  const re = /(Changed|Observed|Meaning|Limit):\s*/g;
-  const marks = [...text.matchAll(re)];
-  if (marks.length >= 2) {
-    const pre = text.slice(0, marks[0].index).trim();
-    marks.forEach((m, i) => {
-      const end = i + 1 < marks.length ? marks[i + 1].index : text.length;
-      parts[m[1]] = text.slice(m.index! + m[0].length, end).trim();
-    });
-    const lead = parts.Observed || parts.Changed || pre;
-    const rest = [pre && pre !== lead ? pre : '', parts.Changed && parts.Changed !== lead ? `Changed: ${parts.Changed}` : '', parts.Meaning ? `Meaning: ${parts.Meaning}` : ''].filter(Boolean);
-    return { lead, rest, limit: parts.Limit };
-  }
-  const sentences = text.match(/[^.!?]+[.!?]+(\s|$)/g) ?? [text];
-  return { lead: sentences.slice(0, 2).join('').trim(), rest: sentences.length > 2 ? [sentences.slice(2).join('').trim()] : [] };
-}
 
 /** Map a receipt to the manual control it corresponds to. */
 function receiptTarget(r: string): HighlightTarget {
@@ -152,7 +134,7 @@ export function InvestigationPanel() {
     <section className="card ask-panel" aria-labelledby="ask-h" id="ask-panel">
       <div className="ask-head">
         <div className="ask-intro">
-          <h2 id="ask-h">Ask AstroRipple</h2>
+          <h2 id="ask-h" className="panel-title">Ask OrbitStudio</h2>
         </div>
         {c.ai.checked ? (
           c.ai.available ? (
@@ -215,7 +197,7 @@ export function InvestigationPanel() {
           }}
         >
           <label htmlFor="ask" className="sr-only">
-            Ask AstroRipple a what-if question
+            Ask OrbitStudio a what-if question
           </label>
           <input
             id="ask"
@@ -227,11 +209,11 @@ export function InvestigationPanel() {
             enterKeyHint="send"
             aria-describedby="ask-hint"
           />
-          <button type="submit" className="btn primary" disabled={c.busy || !q.trim()} aria-label={c.busy ? 'Investigating your question' : 'Ask AstroRipple'}>
+          <button type="submit" className="btn primary" disabled={c.busy || !q.trim()} aria-label={c.busy ? 'Investigating your question' : 'Ask OrbitStudio'}>
             {c.busy ? '…' : <IconSend />} Ask
           </button>
         </form>
-        <p className="ask-hint" id="ask-hint">{c.busy ? 'Investigating…' : 'Every answer moves the same controls you can use by hand.'}</p>
+        <p className={`ask-hint ${c.busy ? '' : 'sr-only'}`} id="ask-hint">{c.busy ? 'Investigating…' : 'Every answer moves the same controls you can use by hand.'}</p>
       </div>
     </section>
   );

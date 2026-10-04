@@ -1,14 +1,15 @@
 {
-  "name": "astroripple",
+  "name": "orbitstudio",
   "version": "0.1.0",
   "private": true,
-  "description": "AstroRipple — ask why about a rocket launch and see the answer happen. Educational 3D what-if launch explorer.",
+  "description": "OrbitStudio — ask why about a rocket launch and see the answer happen. Educational 3D what-if launch explorer.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "test": "vitest run",
     "test:watch": "vitest",
+    "e2e": "node e2e/run.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

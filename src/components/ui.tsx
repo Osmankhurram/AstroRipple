@@ -180,14 +180,27 @@ export function useTween(value: number, enabled: boolean, ms = 650): number {
   return shown;
 }
 
-/** The AstroRipple mark: concentric ripple rings around a dot. */
+/** The OrbitStudio mark: a planet with a tilted orbit and one satellite (front arc drawn over the planet). */
 export function Logo({ size = 28 }: { size?: number }) {
+  const mask = `orbit-gap-${useId().replace(/:/g, '')}`;
+  const back = 'M2.5 16 A13.5 5 0 0 1 29.5 16';
+  const front = 'M2.5 16 A13.5 5 0 0 0 29.5 16';
   return (
     <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden="true">
-      <circle cx="16" cy="16" r="3.2" fill="#e8edf5" />
-      <circle cx="16" cy="16" r="8" fill="none" stroke="#e8edf5" strokeOpacity="0.7" strokeWidth="1.4" />
-      <circle cx="16" cy="16" r="13" fill="none" stroke="#e8edf5" strokeOpacity="0.32" strokeWidth="1.2" />
-      <ellipse cx="16" cy="16" rx="14.5" ry="5" fill="none" stroke="#c4a7ff" strokeWidth="1.3" transform="rotate(-28 16 16)" />
+      <defs>
+        <mask id={mask} maskUnits="userSpaceOnUse">
+          <rect width="32" height="32" fill="#fff" />
+          <path d={front} fill="none" stroke="#000" strokeWidth="3.4" transform="rotate(-22 16 16)" />
+        </mask>
+      </defs>
+      <g transform="rotate(-22 16 16)" fill="none" strokeWidth="1.3" strokeLinecap="round">
+        <path d={back} stroke="#dce7f3" strokeOpacity="0.4" />
+      </g>
+      <circle cx="16" cy="16" r="6.6" fill="#dce7f3" mask={`url(#${mask})`} />
+      <g transform="rotate(-22 16 16)" fill="none" strokeWidth="1.3" strokeLinecap="round">
+        <path d={front} stroke="#dce7f3" strokeOpacity="0.9" />
+        <circle cx="26.3" cy="19.2" r="1.9" fill="#ff9f43" stroke="none" />
+      </g>
     </svg>
   );
 }

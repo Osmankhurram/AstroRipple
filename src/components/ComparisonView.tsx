@@ -7,7 +7,6 @@ import { store, useInvestigation } from '@/state/store';
 import { GuidedBar, useGuidedActive } from './GuidedDemo';
 import { IconEye, IconLegend, IconOverview, IconPlane, IconSite } from './icons';
 import { PlaybackBar } from './PlaybackBar';
-import { ResultStrip } from './ResultStrip';
 import { COLORS } from './sceneColors';
 import { Popover, useMediaQuery, useTransitioning } from './ui';
 import { ViewingCard } from './ViewingCard';
@@ -65,14 +64,14 @@ function Hud({ which, showScale }: { which: ScenarioId; showScale: boolean }) {
   const hypothetical = which === 'experiment' && m.offsetMinutes !== 0;
   return (
     <>
-      <div className="hud tl" title={`${sc.launchTimeUtc}${hypothetical ? ' (hypothetical)' : ''}`}>
-        <div className="hud-title">
+      <div className="hud tl">
+        <div className="hud-title" data-tip={which === 'baseline' ? 'Baseline — the original plan; it never changes' : 'Experiment — your what-if copy; every control edits this view'}>
           <span className="letter">{which === 'baseline' ? 'B' : 'E'}</span>
           {which === 'baseline' ? 'Baseline' : 'Experiment'}
           {hypothetical ? <span className="off">{fmtOffset(m.offsetMinutes)}</span> : null}
         </div>
         <div className="hud-sub">
-          <span>
+          <span data-tip={`Launch ${sc.launchTimeUtc.replace('T', ' ').slice(0, 16)} UTC${hypothetical ? ' (hypothetical)' : ''} · ${PRESET_SHORT[sc.orbitPreset]} orbit, ${sc.inclinationDeg}° inclination`}>
             {pad(d.getUTCHours())}:{pad(d.getUTCMinutes())} UTC · {PRESET_SHORT[sc.orbitPreset]} {sc.inclinationDeg}°
           </span>
         </div>
@@ -171,10 +170,10 @@ export function ComparisonView() {
       store.dispatch({ type: 'SET_SHOWN', shown: v });
     }
   };
-  const options: { v: 'compare' | ScenarioId; label: string; c: string }[] = [
-    ...(narrow ? [] : [{ v: 'compare' as const, label: 'Compare', c: 'var(--signal)' }]),
-    { v: 'baseline', label: 'Baseline', c: COLORS.baseline },
-    { v: 'experiment', label: 'Experiment', c: COLORS.experiment },
+  const options: { v: 'compare' | ScenarioId; label: string; c: string; tip: string }[] = [
+    ...(narrow ? [] : [{ v: 'compare' as const, label: 'Compare', c: 'var(--signal)', tip: 'Baseline and experiment side by side' }]),
+    { v: 'baseline', label: 'Baseline', c: COLORS.baseline, tip: 'The original plan — never changes' },
+    { v: 'experiment', label: 'Experiment', c: COLORS.experiment, tip: 'Your what-if copy — every control edits this' },
   ];
 
   return (
@@ -191,6 +190,7 @@ export function ComparisonView() {
               aria-checked={selected === o.v}
               style={{ ['--seg-c' as string]: o.c } as React.CSSProperties}
               onClick={() => choose(o.v)}
+              data-tip={o.tip}
             >
               {o.label}
             </button>
@@ -198,22 +198,6 @@ export function ComparisonView() {
         </div>
         <SatelliteToggle />
         <span className="grow" />
-        <div className="cam-btns" role="group" aria-label="Camera">
-          <button type="button" className="btn sm" onClick={() => store.dispatch({ type: 'FOCUS', target: 'overview' })} aria-label="Overview" title="Overview">
-            <IconOverview /> <span className="txt">Overview</span>
-          </button>
-          <button type="button" className="btn sm" onClick={() => store.dispatch({ type: 'FOCUS', target: 'launch-site' })} aria-label="Focus launch site" title="Focus launch site">
-            <IconSite /> <span className="txt">Launch site</span>
-          </button>
-          {!st.satellite.enabled && (
-            <button type="button" className="btn sm" onClick={() => store.dispatch({ type: 'FOCUS', target: 'orbital-plane' })} aria-label="View orbital plane" title="View the orbital plane edge-on">
-              <IconPlane /> <span className="txt">Orbit plane</span>
-            </button>
-          )}
-          <Popover label={<IconLegend />} className="btn sm" ariaLabel="Legend" panelClass="legend-pop">
-            <LegendItems />
-          </Popover>
-        </div>
         <button
           type="button"
           className={`btn sm view-btn ${st.view.viewing ? 'on' : ''}`}
@@ -231,9 +215,25 @@ export function ComparisonView() {
             <Pane key={w} which={w} active={panes.includes(w)} webgl={webgl} differs={differs} showScale={w === lastPane} />
           ))}
         </div>
-        <PlaybackBar />
+        {/* Viewport tool rail (map-style): camera presets + legend, floating on the right edge. */}
+        <div className="cam-btns" role="group" aria-label="Camera">
+          <button type="button" className="btn sm" onClick={() => store.dispatch({ type: 'FOCUS', target: 'overview' })} aria-label="Overview" title="Overview">
+            <IconOverview />
+          </button>
+          <button type="button" className="btn sm" onClick={() => store.dispatch({ type: 'FOCUS', target: 'launch-site' })} aria-label="Focus launch site" title="Focus launch site">
+            <IconSite />
+          </button>
+          {!st.satellite.enabled && (
+            <button type="button" className="btn sm" onClick={() => store.dispatch({ type: 'FOCUS', target: 'orbital-plane' })} aria-label="View orbital plane" title="View the orbital plane edge-on">
+              <IconPlane />
+            </button>
+          )}
+          <Popover label={<IconLegend />} className="btn sm" ariaLabel="Legend" panelClass="legend-pop">
+            <LegendItems />
+          </Popover>
+        </div>
       </div>
-      <ResultStrip />
+      <PlaybackBar />
     </section>
   );
 }

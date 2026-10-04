@@ -4,7 +4,8 @@
  * explained, never the canonical geometry.
  */
 import { useSyncExternalStore } from 'react';
-import { runScripted } from '@/ai/scripted';
+import { planScripted, runScripted } from '@/ai/scripted';
+import type { CatalogId } from '@/satellites/catalogs';
 import { snapshotOf, type InvestigateResponse } from '@/ai/protocol';
 import { computeMetrics } from '@/simulation/metrics';
 import type { WeatherAssessment } from '@/simulation/weather';
@@ -51,6 +52,8 @@ export interface AiStatus {
   checked: boolean;
   available: boolean;
   model?: string;
+  /** Whether the server offers the optional real-world feed (fetched with the AI status). */
+  liveData?: boolean;
 }
 
 interface ConvState {
@@ -84,8 +87,8 @@ export const conversation = {
   async checkAi() {
     try {
       const r = await fetch('/api/status', { cache: 'no-store' });
-      const j = (await r.json()) as { ai: boolean; model?: string };
-      set({ ai: { checked: true, available: !!j.ai, model: j.model } });
+      const j = (await r.json()) as { ai: boolean; model?: string; liveData?: boolean };
+      set({ ai: { checked: true, available: !!j.ai, model: j.model, liveData: j.liveData !== false } });
     } catch {
       set({ ai: { checked: true, available: false } });
     }
@@ -106,7 +109,23 @@ function revealTime() {
   return v.reducedMotion ? 0 : v.transitionUntil;
 }
 
-function runScriptedInto(entryId: string, question: string, mode: EntryMode, prefix = '') {
+/** Tools that read catalog snapshots; scripted calls to them need the catalog loaded first. */
+const CATALOG_TOOLS = new Set(['set_satellite_mode', 'set_screening_catalog', 'select_satellite', 'screen_launch_proximity', 'compare_launch_offsets', 'focus_close_approach']);
+
+/** Scripted tools run synchronously against loaded catalogs: fetch what a satellite question needs (≤ 20 s). */
+async function prefetchCatalogsFor(question: string) {
+  const st = store.get();
+  const plan = planScripted(question, st, clientToolContext);
+  if (!plan?.some((c) => CATALOG_TOOLS.has(c.name))) return;
+  const ids = new Set<CatalogId>([st.satellite.catalogId]);
+  for (const c of plan) if (c.name === 'set_screening_catalog') ids.add(c.input.catalogId as CatalogId);
+  if (plan.some((c) => c.name === 'select_satellite')) ids.add('stations'); // small; the fallback home of the ISS
+  const all = Promise.all([...ids].map((id) => satRuntime.fetchCatalog(id)));
+  await Promise.race([all, new Promise((r) => setTimeout(r, 20_000))]);
+}
+
+async function runScriptedInto(entryId: string, question: string, mode: EntryMode, prefix = '') {
+  await prefetchCatalogsFor(question);
   const run = runScripted(question, store.get(), clientToolContext);
   const receipts: string[] = [];
   for (const o of run.outcomes) {
@@ -114,7 +133,7 @@ function runScriptedInto(entryId: string, question: string, mode: EntryMode, pre
     if (o.ok) store.applyRemote(newId(), store.get().revision, o.actions);
   }
   const evidence = weatherEvidence(run.outcomes.filter((o) => o.ok).map((o) => ({ tool: o.name, input: run.plan?.find((p) => p.name === o.name)?.input })));
-  patchEntry(entryId, { text: prefix + run.explanation, receipts, evidence, status: run.understood ? 'done' : 'error', mode, revealAt: revealTime() });
+  patchEntry(entryId, { text: prefix + run.explanation, detail: run.detail, receipts, evidence, status: run.understood ? 'done' : 'error', mode, revealAt: revealTime() });
 }
 
 async function ask(question: string) {
@@ -128,7 +147,12 @@ async function ask(question: string) {
   const entryId = conversation.push({ role: 'assistant', text: '', status: 'pending', mode: cs.ai.available ? 'live' : 'scripted' });
 
   if (!cs.ai.available) {
-    runScriptedInto(entryId, q, 'scripted');
+    set({ busy: true });
+    try {
+      await runScriptedInto(entryId, q, 'scripted');
+    } finally {
+      set({ busy: false });
+    }
     return;
   }
 
@@ -166,7 +190,7 @@ async function ask(question: string) {
     }
   } catch (err) {
     const reason = (err as Error).name === 'AbortError' ? 'timed out' : (err as Error).message;
-    runScriptedInto(entryId, q, 'fallback', `The live AI did not answer (${reason}); the scene was kept and the scripted demo handled it instead. `);
+    await runScriptedInto(entryId, q, 'fallback', `The live AI did not answer (${reason}); the scene was kept and the scripted demo handled it instead. `);
   } finally {
     clearTimeout(timer);
     set({ busy: false });

@@ -35,7 +35,7 @@ import { parseGpArray, type ParsedGroup } from '../omm';
 export const MIN_REFRESH_MS = 2 * 3600_000;
 export const FAILURE_HOLD_MS = 2 * 3600_000;
 const FETCH_TIMEOUT_MS = 25_000;
-const USER_AGENT = 'AstroRipple/0.1 (educational launch-visualization demo; cached server-side, 2 h refresh)';
+const USER_AGENT = 'OrbitStudio/0.1 (educational launch-visualization demo; cached server-side, 2 h refresh)';
 
 type Group = 'stations' | 'active';
 
