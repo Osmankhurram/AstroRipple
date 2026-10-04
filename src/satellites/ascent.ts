@@ -1,7 +1,7 @@
 /**
  * Time-parameterised launch ascent contract + the illustrative Earth-fixed ascent fixture.
  *
- * The pre-existing AstroRipple model had NO ascent (only a frozen target plane and an unphased
+ * The original OrbitStudio model had NO ascent (only a frozen target plane and an unphased
  * marker), which cannot support rocket–satellite encounter screening. This module adds an explicit,
  * clearly labelled ILLUSTRATIVE ascent:
  *  - frame: ECF (Earth-fixed), kilometres, Earth centre origin — the same frame satellites are

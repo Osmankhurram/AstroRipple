@@ -8,6 +8,7 @@
 import { executeTool, type ToolContext, type ToolOutcome, type ToolResultPayload } from './toolExecutor';
 import type { InvestigationState } from '../state/reducer';
 import { RESULT_DISCLAIMER, fmtKm } from '../satellites/screening';
+import { LAUNCH_SITES } from '../data/demoMission';
 
 export interface PlannedCall {
   name: string;
@@ -75,7 +76,7 @@ function parseDelayNoun(s: string): { minutes: number; relativeTo: 'baseline' } 
 /** Parse a delay/advance in minutes from free text, or null. */
 export function parseOffset(q: string): { minutes: number; relativeTo: 'baseline' | 'experiment' } | null {
   const s = q.toLowerCase();
-  const m = s.match(/\b(\d+(?:\.\d+)?|half an?|another|an?|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s*(hours?|hrs?|h\b|minutes?|mins?)/);
+  const m = s.match(/\b(\d+(?:\.\d+)?|half an?|another|an?|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s*(?:(?:more|extra|additional|further)\s+)?(hours?|hrs?|h\b|minutes?|mins?)/);
   if (!m) return null;
   let qty: number;
   if (m[1].startsWith('half')) qty = 0.5;
@@ -83,10 +84,11 @@ export function parseOffset(q: string): { minutes: number; relativeTo: 'baseline
   else qty = parseFloat(m[1]);
   const unitMin = m[2].startsWith('h') ? 60 : 1;
   let minutes = Math.round(qty * unitMin);
+  // "another hour", "one more hour": incremental on the current experiment, later unless told otherwise.
+  const incremental = /\b(another|more|further|additional|again|extra)\b/.test(s);
   if (/\b(earlier|sooner|before|advance|ahead of schedule|move up)\b/.test(s)) minutes = -minutes;
-  else if (!/\b(later|delay|delayed|after|push|postpone|wait|slip)\b/.test(s)) return null;
-  const relativeTo = /\b(another|more|further|additional|again|extra)\b/.test(s) ? 'experiment' : 'baseline';
-  return { minutes, relativeTo };
+  else if (!incremental && !/\b(later|delay|delayed|after|push|postpone|wait|slip)\b/.test(s)) return null;
+  return { minutes, relativeTo: incremental ? 'experiment' : 'baseline' };
 }
 
 export function planScripted(question: string, state: InvestigationState): PlannedCall[] | null {
@@ -117,12 +119,14 @@ export function planScripted(question: string, state: InvestigationState): Plann
 
 export function templateExplanation(outcome: ToolOutcome): string {
   const r = outcome.result as ToolResultPayload;
-  if (!outcome.ok) return `I couldn't do that: ${(outcome.result as { error: string }).error} The manual controls below the globe are still available.`;
+  if (!outcome.ok) return `I couldn't do that: ${(outcome.result as { error: string }).error} The manual controls are still available.`;
   const lim = r.limitations?.[0] ? ` Limit: ${r.limitations[0]}` : '';
   switch (r.tool) {
     case 'set_launch_offset': {
       const a = r.after!, b = r.baseline!;
-      return `Changed: launch time ${a.offsetFromBaseline} from baseline. Observed: Earth rotated ${Math.abs(a.earthRotationFromBaselineDeg).toFixed(1)}°, but the site-to-plane angle went from ${b.siteToPlaneAngleDeg.toFixed(1)}° to ${a.siteToPlaneAngleDeg.toFixed(1)}° — a different number, because the site is at a mid latitude and the plane is tilted. Meaning: the target plane stayed fixed while the launch site rotated away from it. Demo weather: ${b.weatherStatus} → ${a.weatherStatus}.${lim}`;
+      const lat = Object.values(LAUNCH_SITES).find((x) => x.name === a.launchSite)?.latDeg;
+      const why = lat !== undefined ? `the site sits at ${Math.abs(lat).toFixed(1)}° ${lat >= 0 ? 'N' : 'S'} on a plane tilted ${a.inclinationDeg}°` : 'the plane is tilted relative to the site';
+      return `Changed: launch time ${a.offsetFromBaseline} from baseline. Observed: Earth rotated ${Math.abs(a.earthRotationFromBaselineDeg).toFixed(1)}°, but the site-to-plane angle went from ${b.siteToPlaneAngleDeg.toFixed(1)}° to ${a.siteToPlaneAngleDeg.toFixed(1)}° — a different number, because ${why}. Meaning: the target plane stayed fixed while the launch site rotated with Earth. Demo weather: ${b.weatherStatus} → ${a.weatherStatus}.${lim}`;
     }
     case 'set_orbit_preset': {
       const a = r.after!, b = r.before!;
@@ -139,7 +143,7 @@ export function templateExplanation(outcome: ToolOutcome): string {
     }
     case 'focus_scene':
       return r.focused === 'orbital-plane'
-        ? 'Showing the orbital plane nearly edge-on. The amber arc is the site-to-plane angle: the geometric separation between the launch site\'s direction and the target plane. It is not a steering angle or fuel cost.'
+        ? 'Showing the orbital plane nearly edge-on. The violet arc is the site-to-plane angle: the geometric separation between the launch site\'s direction and the target plane. It is not a steering angle or fuel cost.'
         : `Focused on ${String(r.focused).replace('-', ' ')}. Camera moves never change the numbers.`;
     case 'reset_experiment':
       return 'The experiment is back to an exact copy of the baseline.';
@@ -197,12 +201,22 @@ export interface ScriptedRun {
   plan: PlannedCall[] | null;
   outcomes: ToolOutcome[];
   explanation: string;
+  /** Secondary text shown behind the answer's disclosure (the supported-actions list). */
+  detail?: string;
   understood: boolean;
 }
 
+/** Calculations this model deliberately cannot do — answered honestly rather than "not understood". */
+const UNSUPPORTED = /\b(fuel|propellant|delta[- ]?v|payload|cost|price|success|odds|probabilit\w*|chance)\b/;
+
 export function runScripted(question: string, state: InvestigationState, ctx?: ToolContext): ScriptedRun {
   const plan = planScripted(question, state);
-  if (!plan) return { plan, outcomes: [], explanation: `I can't answer that in scripted demo mode. ${SUPPORTED_HELP}`, understood: false };
+  if (!plan) {
+    const explanation = UNSUPPORTED.test(question.toLowerCase())
+      ? "This model can't compute that in scripted demo mode: it shows launch geometry, demo weather and estimated satellite positions, not fuel, cost or success odds."
+      : "That's outside what scripted demo mode can answer. Try a suggestion below.";
+    return { plan, outcomes: [], explanation, detail: SUPPORTED_HELP, understood: false };
+  }
   const outcomes: ToolOutcome[] = [];
   let s = state;
   for (const call of plan) {

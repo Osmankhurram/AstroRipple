@@ -51,6 +51,8 @@ export interface AiStatus {
   checked: boolean;
   available: boolean;
   model?: string;
+  /** Whether the server offers the optional real-world feed (fetched with the AI status). */
+  liveData?: boolean;
 }
 
 interface ConvState {
@@ -84,8 +86,8 @@ export const conversation = {
   async checkAi() {
     try {
       const r = await fetch('/api/status', { cache: 'no-store' });
-      const j = (await r.json()) as { ai: boolean; model?: string };
-      set({ ai: { checked: true, available: !!j.ai, model: j.model } });
+      const j = (await r.json()) as { ai: boolean; model?: string; liveData?: boolean };
+      set({ ai: { checked: true, available: !!j.ai, model: j.model, liveData: j.liveData !== false } });
     } catch {
       set({ ai: { checked: true, available: false } });
     }
@@ -114,7 +116,7 @@ function runScriptedInto(entryId: string, question: string, mode: EntryMode, pre
     if (o.ok) store.applyRemote(newId(), store.get().revision, o.actions);
   }
   const evidence = weatherEvidence(run.outcomes.filter((o) => o.ok).map((o) => ({ tool: o.name, input: run.plan?.find((p) => p.name === o.name)?.input })));
-  patchEntry(entryId, { text: prefix + run.explanation, receipts, evidence, status: run.understood ? 'done' : 'error', mode, revealAt: revealTime() });
+  patchEntry(entryId, { text: prefix + run.explanation, detail: run.detail, receipts, evidence, status: run.understood ? 'done' : 'error', mode, revealAt: revealTime() });
 }
 
 async function ask(question: string) {

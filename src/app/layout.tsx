@@ -4,7 +4,7 @@ import '@fontsource-variable/jetbrains-mono/wght.css';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'AstroRipple — ask why about a rocket launch',
+  title: 'OrbitStudio — what-if launch explorer',
   description: 'An AI-guided, interactive 3D what-if explorer for launch timing, orbits, and weather. Educational simulation.',
 };
 

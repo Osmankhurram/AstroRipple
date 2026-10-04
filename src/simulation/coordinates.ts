@@ -1,7 +1,7 @@
 /**
  * Demonstration Earth-centred inertial-like frame ("demo ECI").
  *
- * Conventions (documented in docs/SIMULATION.md):
+ * Conventions (documented in docs/SYSTEM_DESIGN.md §4):
  *  - Right-handed. +z through the geographic north pole. East-positive longitude.
  *  - Spherical Earth, unit radius for geometry.
  *  - Earth-fixed unit vector: r_fixed = [cos(lat)cos(lon), cos(lat)sin(lon), sin(lat)].

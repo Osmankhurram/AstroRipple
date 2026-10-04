@@ -73,7 +73,7 @@ function onMessage(msg: WorkerOut) {
 function ensurePort() {
   if (port || typeof window === 'undefined') return port;
   try {
-    const w = new Worker(new URL('../satellites/worker/satWorker.ts', import.meta.url), { type: 'module', name: 'astroripple-satellites' });
+    const w = new Worker(new URL('../satellites/worker/satWorker.ts', import.meta.url), { type: 'module', name: 'orbitstudio-satellites' });
     w.onmessage = (e: MessageEvent<WorkerOut>) => onMessage(e.data);
     w.onerror = (e) => {
       console.error('satellite worker error', e.message);

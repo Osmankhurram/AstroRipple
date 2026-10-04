@@ -1,5 +1,5 @@
 /**
- * Local demonstration fixtures for the fictional "Detective-1" mission.
+ * Local demonstration fixtures for the fictional OrbitStudio demo mission.
  *
  * Everything here is invented for teaching and labelled `demo`. Window times are generated
  * relative to the moment the app loads so the countdown always points to a future window;
@@ -72,7 +72,7 @@ export interface Mission {
   anchorMs: number;
 }
 
-export const DEMO_MISSION_ID = 'detective-1';
+export const DEMO_MISSION_ID = 'demo-1';
 
 const HOUR = 3600_000;
 const MIN = 60_000;
@@ -90,7 +90,7 @@ export function buildDemoMission(nowMs: number): Mission {
   const b = a + 3 * HOUR; // crosses midnight UTC by design
   return {
     id: DEMO_MISSION_ID,
-    name: 'Detective-1 — Demonstration Mission',
+    name: 'OrbitStudio demo mission',
     vehicle: 'Fictional small launcher',
     description:
       'A fictional mission to an illustrative 500 km orbit, designed for teaching. Windows, weather, and orbit are demonstration data.',

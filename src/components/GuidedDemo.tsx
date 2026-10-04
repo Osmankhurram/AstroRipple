@@ -145,8 +145,11 @@ export function startGuided() {
   conversation.clear();
   setG({ active: true, step: 0, prediction: null });
   STEPS[0].run();
+  // Only scroll when the globe is out of view (on wide screens it already fills the viewport).
   requestAnimationFrame(() => {
-    document.getElementById('orbital-view')?.scrollIntoView({ block: 'start', behavior: store.get().view.reducedMotion ? 'auto' : 'smooth' });
+    const el = document.getElementById('orbital-view');
+    const r = el?.getBoundingClientRect();
+    if (el && r && (r.top < 0 || r.top > window.innerHeight * 0.5)) el.scrollIntoView({ block: 'start', behavior: store.get().view.reducedMotion ? 'auto' : 'smooth' });
   });
 }
 
@@ -210,7 +213,10 @@ export function GuidedBar() {
         </span>
       )}
       <span className="grow" />
-      <a className="tour-explanation" href="#ask" aria-label="Read the tour explanation">Explanation <span aria-hidden="true">↓</span></a>
+      {/* The Ask panel sits left of the globe on wide screens and below it otherwise. */}
+      <a className="tour-explanation" href="#ask" aria-label="Read the tour explanation">
+        <span className="dir-side" aria-hidden="true">← </span>Explanation <span className="dir-down" aria-hidden="true">↓</span>
+      </a>
       <span className="tour-actions">
         <button type="button" className="btn sm ghost" onClick={() => setG({ auto: !g.auto })} aria-pressed={g.auto} title="Advance automatically">
           {g.auto ? '❚❚ Auto' : '▶ Auto'}

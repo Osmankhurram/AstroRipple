@@ -45,7 +45,7 @@ export const CATALOGS: Record<CatalogId, CatalogDef> = {
   'active-sample': {
     id: 'active-sample',
     label: `Active LEO sample (${ACTIVE_SAMPLE_SIZE})`,
-    short: 'Active sample',
+    short: `LEO sample · ${ACTIVE_SAMPLE_SIZE}`,
     upstreamGroup: 'active',
     description: `${ACTIVE_SAMPLE_SIZE} objects evenly spaced by catalog number among LEO objects (≥ 11.25 rev/day, e < 0.25) in CelesTrak's 'active' group.`,
     synthetic: false,

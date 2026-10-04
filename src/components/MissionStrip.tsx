@@ -23,34 +23,22 @@ function Countdown() {
     return () => clearInterval(t);
   }, []);
   const c = countdown(st.mission, now);
+  const label = c.state === 'open' ? `Window ${c.window!.id} open` : c.window ? `Next · Window ${c.window.id}` : 'Next window';
   return (
-    <div className="rail-cell count">
-      <div className="row">
-        <span className="label" title="Counts down on your clock to the next supplied window. What-if experiments never change it.">Next window</span>
-      </div>
+    <div className="rail-cell count" title={c.window ? `Window ${c.window.id} · ${fmtUtc(c.window.startUtc)}. Counts down on your clock; what-if experiments never change it.` : undefined}>
+      <span className="label">{label}</span>
       {c.state === 'upcoming' && (
-        <>
-          <div className="countdown-digits" role="timer" aria-label={`Window ${c.window!.id} opens in ${formatCountdown(c.msRemaining)}`}>
-            T−{formatCountdown(c.msRemaining)}
-          </div>
-          <span className="window-date">
-            Window {c.window!.id} · {fmtUtc(c.window!.startUtc)}
-          </span>
-        </>
+        <div className="countdown-digits" role="timer" aria-label={`Window ${c.window!.id} opens in ${formatCountdown(c.msRemaining)}`}>
+          T−{formatCountdown(c.msRemaining)}
+        </div>
       )}
-      {c.state === 'open' && (
-        <>
-          <div className="countdown-digits open">Window {c.window!.id} open</div>
-          <span className="window-date">Closes in {formatCountdown(c.msRemaining)}</span>
-        </>
-      )}
+      {c.state === 'open' && <div className="countdown-digits open">Closes {formatCountdown(c.msRemaining)}</div>}
       {c.state === 'tentative' && (
-        <>
-          <div className="countdown-digits soft">{fmtUtc(c.window!.startUtc).split(' ').slice(0, 2).join(' ')}</div>
-          <span className="window-date">Tentative — no exact countdown</span>
-        </>
+        <div className="countdown-digits soft" title="Tentative — no exact countdown">
+          {fmtUtc(c.window!.startUtc).split(' ').slice(0, 2).join(' ')} <span className="window-date">tentative</span>
+        </div>
       )}
-      {c.state === 'none' && <div className="countdown-digits soft">No next window</div>}
+      {c.state === 'none' && <div className="countdown-digits soft">—</div>}
     </div>
   );
 }
@@ -63,11 +51,9 @@ function WindowCell({ w, className }: { w: LaunchWindow; className: string }) {
   const pad = (x: number) => String(x).padStart(2, '0');
   return (
     <div className={`rail-cell ${className} ${hl ? 'pulse' : ''}`} key={hl ? `hl-${st.view.highlightNonce}` : 'idle'}>
-      <div className="row">
-        <span className="label" title="A fictional window supplied with the mission. Select the weather light to see why.">Window {w.id}</span>
-      </div>
-      <div className="row win-row">
-        <span className="window-time">
+      <span className="label">Window {w.id}</span>
+      <div className="win-row">
+        <span className="window-time" data-tip={`Window ${w.id} opens ${fmtUtc(w.startUtc)} — a fictional window supplied with the demo mission`}>
           {pad(d.getUTCHours())}:{pad(d.getUTCMinutes())}
           <span className="window-date"> UTC · {fmtUtc(w.startUtc).split(' ').slice(0, 2).join(' ')}</span>
         </span>

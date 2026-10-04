@@ -1,7 +1,7 @@
 /**
  * Demonstration weather-impact heuristic.
  *
- * These thresholds are TEACHING CHOICES for the fictional Detective-1 mission. They are not
+ * These thresholds are TEACHING CHOICES for the fictional demo mission. They are not
  * certified launch-commit criteria and do not produce a probability of launch approval.
  */
 

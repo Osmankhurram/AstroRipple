@@ -6,6 +6,7 @@ import { liveClock, store, useInvestigation } from '@/state/store';
 import { ComparisonView } from './ComparisonView';
 import { GuidedButton } from './GuidedDemo';
 import { HowItWorks, openHowItWorks } from './HowItWorks';
+import { HoverTips } from './HoverTips';
 import { IconHelp, IconReset } from './icons';
 import { InvestigationPanel } from './InvestigationPanel';
 import { LiveFeed } from './LiveFeed';
@@ -103,10 +104,11 @@ function CommandBar() {
     <header className="topbar">
       <div className="brand">
         <Logo />
-        <span className="brand-name">AstroRipple<span className="brand-dot">.</span></span>
-        <span className="brand-tag">what-if launch lab</span>
+        <span className="brand-name">
+          Orbit<span className="brand-thin">Studio</span>
+        </span>
       </div>
-      <span className="spacer" />
+      <MissionStrip />
       <div className="topbar-actions">
         <button type="button" className="btn ghost" onClick={openHowItWorks} title="How it works" aria-label="Guide: how it works">
           <IconHelp /> <span className="txt">Guide</span>
@@ -136,28 +138,37 @@ export default function App() {
         Skip to Ask
       </a>
       <CommandBar />
-      <MissionStrip />
-      <main className="main" id="workspace">
-        {/* Flow: see (globe) → understand (readout / screening) → change (controls).
-            In Satellite Mode the screening panel is the primary result, so it sits right under the globe. */}
-        <div className={`left ${st.satellite.enabled ? 'sat' : ''}`}>
+      {/* Cockpit: ask (left) · see (centre) · change + readout (right). DOM order stays
+          see → change → ask so narrow screens and screen readers get the same flow as before.
+          In Satellite Mode the screening panel sits right under the globe. */}
+      <main className={`main ${st.satellite.enabled ? 'sat' : ''}`} id="workspace">
+        <div className="col-stage">
           <ComparisonView />
-          {st.satellite.enabled && <ProximityPanel />}
-          <TimelineControls />
         </div>
-        <aside className="side" aria-label="Investigation assistant">
+        {st.satellite.enabled && (
+          <div className="col-prox">
+            <ProximityPanel />
+          </div>
+        )}
+        <aside className="col-exp" aria-label="Experiment controls and readout">
+          <TimelineControls />
+        </aside>
+        <aside className="col-ask" aria-label="Investigation assistant">
           <InvestigationPanel />
         </aside>
       </main>
       <LiveFeed />
       <footer className="footer">
-        <span>AstroRipple · educational simulation · not launch guidance</span>
+        <span>
+          <i className="led" aria-hidden="true" /> OrbitStudio · educational simulation · not launch guidance
+        </span>
         <button type="button" className="btn ghost sm" onClick={openHowItWorks}>
           How it works
         </button>
       </footer>
       <HowItWorks />
       <Toasts />
+      <HoverTips />
       <ScreeningController />
     </div>
   );

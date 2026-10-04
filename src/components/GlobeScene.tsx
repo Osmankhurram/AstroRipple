@@ -20,7 +20,8 @@
  * the repeated Earth-fixed ascent does not claim to reach that unchanged plane after a delay.
  */
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { Html, Line, OrbitControls, Stars } from '@react-three/drei';
+import { Line, OrbitControls, Stars } from '@react-three/drei';
+import { SceneHtml } from './SceneHtml';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
@@ -240,7 +241,7 @@ function SiteRipple({ trigger, color, reduced }: { trigger: number; color: strin
   );
 }
 
-function SiteMarker({ color, markerRef, children }: { color: string; markerRef: React.RefObject<THREE.Group | null>; children?: React.ReactNode }) {
+function SiteMarker({ color, markerRef, hideLabel, children }: { color: string; markerRef: React.RefObject<THREE.Group | null>; hideLabel?: boolean; children?: React.ReactNode }) {
   return (
     <group ref={markerRef}>
       {children}
@@ -252,11 +253,12 @@ function SiteMarker({ color, markerRef, children }: { color: string; markerRef: 
         <ringGeometry args={[0.03, 0.045, 32]} />
         <meshBasicMaterial color={color} side={THREE.DoubleSide} transparent opacity={0.85} />
       </mesh>
-      <Html position={[0, 0.12, 0]} center zIndexRange={[20, 0]} style={{ pointerEvents: 'none' }}>
+      {/* Hidden while Best view is on: its spot is often only ~15 km away, so the two labels would collide. */}
+      <SceneHtml position={[0, 0.12, 0]} center zIndexRange={[20, 0]} style={{ pointerEvents: 'none', display: hideLabel ? 'none' : undefined }}>
         <div className="scene-label" style={{ ['--lc' as string]: color } as React.CSSProperties}>
           Launch site
         </div>
-      </Html>
+      </SceneHtml>
     </group>
   );
 }
@@ -477,9 +479,9 @@ function SceneContents({ which, canvasId, showGhost, containerRef, overlayRef }:
             <ringGeometry args={[0.03, 0.042, 32]} />
             <meshBasicMaterial color={COLORS.baseline} side={THREE.DoubleSide} transparent opacity={0.9} />
           </mesh>
-          <Html position={[0, -0.09, 0]} center zIndexRange={[20, 0]} style={{ pointerEvents: 'none', display: showGhost && !planeHidden ? undefined : 'none' }}>
+          <SceneHtml position={[0, -0.09, 0]} center zIndexRange={[20, 0]} style={{ pointerEvents: 'none', display: showGhost && !planeHidden ? undefined : 'none' }}>
             <div className="scene-label ghost-label">Baseline site</div>
-          </Html>
+          </SceneHtml>
         </group>
       )}
 
@@ -488,7 +490,7 @@ function SceneContents({ which, canvasId, showGhost, containerRef, overlayRef }:
         <Earth />
         {satEver.current && <SatelliteLayer which={which} focusBus={focusBus} paneColor={color} enabled={satMode} />}
         <ViewingLayer which={which} paneColor={color} />
-        <SiteMarker color={color} markerRef={marker}>
+        <SiteMarker color={color} markerRef={marker} hideLabel={st.view.viewing}>
           {which === 'experiment' && (
             <SiteRipple trigger={st.revision} color={sameScenario(st.experiment, st.baseline) ? COLORS.baseline : COLORS.experiment} reduced={st.view.reducedMotion} />
           )}

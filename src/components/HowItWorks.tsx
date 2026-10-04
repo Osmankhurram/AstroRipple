@@ -37,13 +37,13 @@ export function HowItWorks() {
       }}
     >
       <div className="sheet-head">
-        <h2 id="how-h">How AstroRipple works</h2>
+        <h2 id="how-h">How OrbitStudio works</h2>
         <button type="button" className="btn icon sm" onClick={close} aria-label="Close">
           <IconClose />
         </button>
       </div>
       <p className="intro">
-        Ask why about a rocket launch — and see the answer happen. Mission: Detective-1 · Florida coast (near Cape Canaveral) · fictional small launcher.
+        Ask why about a rocket launch — and see the answer happen. Mission: fictional demo · Florida coast (near Cape Canaveral) · fictional small launcher.
       </p>
       <div className="legend-prov" aria-label="Data labels">
         <ProvenanceBadge p="demo" /> fictional fixture

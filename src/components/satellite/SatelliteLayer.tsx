@@ -11,7 +11,8 @@
  * - Marker sizes are screen-space and NOT to scale.
  */
 import { useFrame, useThree } from '@react-three/fiber';
-import { Html, Line } from '@react-three/drei';
+import { Line } from '@react-three/drei';
+import { SceneHtml } from '../SceneHtml';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import type { Line2, OrbitControls as OrbitControlsImpl } from 'three-stdlib';
@@ -442,11 +443,11 @@ export function SatelliteLayer({ which, focusBus, paneColor, enabled }: { which:
           <octahedronGeometry args={[1, 0]} />
           <meshBasicMaterial color={paneColor} />
         </mesh>
-        <Html center zIndexRange={[30, 0]} style={{ pointerEvents: 'none', display: scenario ? undefined : 'none', transform: 'translateY(-22px)' }}>
+        <SceneHtml center zIndexRange={[30, 0]} style={{ pointerEvents: 'none', display: scenario ? undefined : 'none', transform: 'translateY(-22px)' }}>
           <div ref={rocketText} className="scene-label" style={{ ['--lc' as string]: paneColor } as React.CSSProperties}>
             Rocket
           </div>
-        </Html>
+        </SceneHtml>
       </group>
       <mesh ref={screenVol} visible={false}>
         <sphereGeometry args={[1, 24, 16]} />
@@ -454,31 +455,31 @@ export function SatelliteLayer({ which, focusBus, paneColor, enabled }: { which:
       </mesh>
       <Line ref={connector as never} points={[[0, 0, 0], [0, 0, 0.001]]} color={SAT_COLORS.approach} lineWidth={2} dashed dashSize={0.002} gapSize={0.0015} depthTest={false} renderOrder={6} />
       <group ref={connLabel} visible={false}>
-        <Html center zIndexRange={[40, 0]} style={{ pointerEvents: 'none', display: focusObj ? undefined : 'none', transform: 'translateY(26px)' }}>
+        <SceneHtml center zIndexRange={[40, 0]} style={{ pointerEvents: 'none', display: focusObj ? undefined : 'none', transform: 'translateY(26px)' }}>
           <div ref={connText} className="scene-label approach-label" />
-        </Html>
+        </SceneHtml>
       </group>
 
       <group ref={selLabel} visible={false}>
-        <Html center position={[0, 0, 0]} zIndexRange={[35, 0]} style={{ pointerEvents: 'none', display: selected ? undefined : 'none', transform: 'translateY(-18px)' }}>
+        <SceneHtml center position={[0, 0, 0]} zIndexRange={[35, 0]} style={{ pointerEvents: 'none', display: selected ? undefined : 'none', transform: 'translateY(-18px)' }}>
           <div ref={selText} className="scene-label sat-label">{selected ? `◎ ${selected.name}` : ''}</div>
-        </Html>
+        </SceneHtml>
       </group>
       {Array.from({ length: MAX_CAND }, (_, i) => {
         const c = candidates[i];
         const show = !!c && c.obj.key !== sat.selectedKey;
         return (
           <group key={i} ref={(g) => { candGroups.current[i] = g; }} visible={false}>
-            <Html center zIndexRange={[34, 0]} style={{ pointerEvents: 'none', transform: 'translateY(16px)', display: show ? undefined : 'none' }}>
+            <SceneHtml center zIndexRange={[34, 0]} style={{ pointerEvents: 'none', transform: 'translateY(16px)', display: show ? undefined : 'none' }}>
               <div ref={(el) => { candTexts.current[i] = el; }} className="scene-label approach-label">{c ? `◆ ${c.obj.name} · ${fmtKm(c.sepKm)}` : ''}</div>
-            </Html>
+            </SceneHtml>
           </group>
         );
       })}
       <group ref={hoverLabel} visible={false}>
-        <Html zIndexRange={[50, 0]} style={{ pointerEvents: 'none', transform: 'translate(12px, -50%)', display: hoverObj ? undefined : 'none' }}>
+        <SceneHtml zIndexRange={[50, 0]} style={{ pointerEvents: 'none', transform: 'translate(12px, -50%)', display: hoverObj ? undefined : 'none' }}>
           <div ref={hoverText}>{hoverObj && snap ? <Details obj={hoverObj} snap={snap} atMs={tNow} label={label} /> : null}</div>
-        </Html>
+        </SceneHtml>
       </group>
     </group>
   );

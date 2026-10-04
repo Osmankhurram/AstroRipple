@@ -49,7 +49,8 @@ export function SatelliteToggle() {
       onClick={() => satAct({ type: 'SAT_SET_ENABLED', enabled: !on })}
       title={on ? 'Turn off Satellite Mode' : 'Show cataloged satellites at their estimated positions'}
     >
-      <IconSatellite /> <span className="txt">{LABELS.mode}</span>
+      {/* "Satellite Mode"; the second word drops on phones so the toolbar stays on one row. */}
+      <IconSatellite /> <span className="txt">{LABELS.mode.split(' ')[0]}<span className="txt-more"> {LABELS.mode.split(' ').slice(1).join(' ')}</span></span>
     </button>
   );
 }
@@ -111,7 +112,7 @@ function SourcePopover() {
           {snap?.attribution} Fetch age is not element age: each object’s position is propagated from its own element epoch. Element sets more than {DEFAULT_AGE_POLICY.warnDays} days from the displayed time are flagged; more than {DEFAULT_AGE_POLICY.rejectDays} days are hidden and excluded.
         </p>
         {snap && !CATALOGS[snap.catalogId].synthetic && (
-          <button type="button" className="btn sm" onClick={() => void satRuntime.ensureCatalog(st.satellite.catalogId, true)} title="Asks the AstroRipple server; it answers from cache unless the provider refresh interval has passed">
+          <button type="button" className="btn sm" onClick={() => void satRuntime.ensureCatalog(st.satellite.catalogId, true)} title="Asks the OrbitStudio server; it answers from cache unless the provider refresh interval has passed">
             Check for update
           </button>
         )}
@@ -286,8 +287,8 @@ export function SatelliteToolbar() {
         onChange={(e) => satAct({ type: 'SAT_SET_CATALOG', catalogId: e.target.value as CatalogId })}
       >
         {CATALOG_IDS.map((id) => (
-          <option key={id} value={id}>
-            {CATALOGS[id].label}
+          <option key={id} value={id} title={CATALOGS[id].label}>
+            {CATALOGS[id].short}
           </option>
         ))}
       </select>

@@ -10,6 +10,7 @@ import { fmtUtc } from '@/state/clock';
 import type { Action } from '@/state/reducer';
 import { store, useInvestigation } from '@/state/store';
 import { IconGear, IconReset, IconUndo } from './icons';
+import { ResultStrip } from './ResultStrip';
 import { COLORS } from './sceneColors';
 import { InfoTip, Popover, Switch, useTween } from './ui';
 
@@ -37,7 +38,7 @@ function ShiftSlider() {
 
   return (
     <div>
-      <div className="slider-wrap">
+      <div className="slider-wrap" data-tip="Drag to shift the experiment launch. Violet curve: site-to-plane angle at each shift">
         <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden="true">
           <path d={area} fill="rgba(196,167,255,0.10)" />
           <path d={line} fill="none" stroke={COLORS.angle} strokeWidth={1.6} vectorEffect="non-scaling-stroke" />
@@ -64,6 +65,13 @@ function ShiftSlider() {
           onPointerCancel={() => setDragging(false)}
           onFocus={() => setDragging(true)}
           onBlur={() => setDragging(false)}
+          onKeyDown={(e) => {
+            // Page Up/Down = ±1 h (the browser default is 10 % of the range, i.e. 2.5 h).
+            if (e.key !== 'PageUp' && e.key !== 'PageDown') return;
+            e.preventDefault();
+            const target = Math.max(-MAX_OFFSET_MINUTES, Math.min(MAX_OFFSET_MINUTES, off + (e.key === 'PageUp' ? 60 : -60)));
+            act({ type: 'SET_OFFSET', minutes: target, relativeTo: 'baseline' });
+          }}
           onChange={(e) => act({ type: 'SET_OFFSET', minutes: Number(e.target.value), relativeTo: 'baseline' })}
         />
       </div>
@@ -99,22 +107,22 @@ export function TimelineControls() {
     <section className="card dock deck" id="experiment-controls" aria-labelledby="controls-heading">
       <header className="deck-toolbar">
         <div className="deck-heading">
-          <h2 id="controls-heading">
+          <h2 id="controls-heading" className="panel-title">
             Experiment
           </h2>
           <InfoTip label="About the experiment">Every control changes only the experiment copy. The baseline stays fixed, so the comparison is always against the original plan.</InfoTip>
         </div>
         <div className="history" role="group" aria-label="Experiment actions">
-          <button type="button" className="btn sm ghost" onClick={() => act({ type: 'UNDO' })} disabled={!st.undoStack.length} title="Undo last change">
-            <IconUndo /> Undo
+          <button type="button" className="btn sm ghost icon" onClick={() => act({ type: 'UNDO' })} disabled={!st.undoStack.length} aria-label="Undo last change" title="Undo last change">
+            <IconUndo />
           </button>
-          <button type="button" className="btn sm ghost" onClick={() => act({ type: 'RESET_EXPERIMENT' })} disabled={st.revision === 0 && !st.undoStack.length} aria-label="Reset experiment to baseline" title="Reset experiment to baseline">
-            <IconReset /> Reset
+          <button type="button" className="btn sm ghost icon" onClick={() => act({ type: 'RESET_EXPERIMENT' })} disabled={st.revision === 0 && !st.undoStack.length} aria-label="Reset experiment to baseline" title="Reset experiment to baseline">
+            <IconReset />
           </button>
           <Popover
-            className="btn sm ghost"
+            className="btn sm ghost icon"
             ariaLabel="Display options"
-            label={<><IconGear /> Display</>}
+            label={<IconGear />}
           >
             <div className="display-options">
               <span className="label plain">Scene preferences</span>
@@ -135,7 +143,7 @@ export function TimelineControls() {
             Moves the experiment’s hypothetical launch time (the real schedule never changes). Curve: site-to-plane angle at every shift — geometry only, not launch windows. Cyan tick: baseline. Dashed tick: supplied Window B.
           </InfoTip>
           <span className="grow" />
-          <span className="shift-value">{Math.round(shown) === 0 ? '0 h' : fmtOffset(Math.abs(shown - off) < 0.5 ? off : Math.round(shown))}</span>
+          <span className="shift-value" data-tip="Hypothetical shift from the baseline launch time">{Math.round(shown) === 0 ? '0 h' : fmtOffset(Math.abs(shown - off) < 0.5 ? off : Math.round(shown))}</span>
         </div>
         <ShiftSlider />
         <div className="shift-actions">
@@ -178,7 +186,7 @@ export function TimelineControls() {
             <InfoTip label="About launch-site changes">Curated locations only. The target plane and baseline time stay fixed. A site change in the model does not mean the same rocket or mission could use that site.</InfoTip>
             {siteChanged && <span className="tag" title="Differs from the baseline site">changed</span>}
           </div>
-          <select id="site" className="field" value={st.experiment.launchSiteId} onChange={(e) => act({ type: 'SET_LAUNCH_SITE', siteId: e.target.value })}>
+          <select id="site" className="field" data-tip="Where the experiment launches from (curated sites)" value={st.experiment.launchSiteId} onChange={(e) => act({ type: 'SET_LAUNCH_SITE', siteId: e.target.value })}>
             {Object.values(LAUNCH_SITES).map((s) => (
               <option key={s.id} value={s.id} title={s.name}>
                 {s.name.split(' (')[0]}
@@ -188,6 +196,8 @@ export function TimelineControls() {
         </div>
       </div>
 
+      {/* ---- Readout: baseline → experiment, pinned to the panel's foot ---- */}
+      <ResultStrip />
     </section>
   );
 }

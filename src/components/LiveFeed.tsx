@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import type { RealLaunch } from '@/data/launchAdapter';
 import type { WeatherAssessment } from '@/simulation/weather';
 import { fmtUtc, formatCountdown } from '@/state/clock';
+import { useConversation } from '@/state/conversation';
 import { InfoTip, ProvenanceDot } from './ui';
 import { WeatherDetails } from './WeatherIndicator';
 
@@ -39,6 +40,10 @@ export function LiveFeed() {
     return () => clearInterval(t);
   }, [data]);
 
+  // The server can switch the feed off (LD_ENABLE_LIVE_DATA=0): then the card is not shown at all.
+  const offered = useConversation().ai;
+  if (offered.checked && offered.liveData === false) return null;
+
   const load = async () => {
     setState('loading');
     try {
@@ -67,9 +72,7 @@ export function LiveFeed() {
       {!data && <p className="livefeed-description">Upcoming real launches and current Florida weather — kept separate from the demo.</p>}
       {state === 'error' && <p className="muted small">■ Could not reach the server. The demo is unaffected.</p>}
       {data && !data.enabled && (
-        <p className="muted small" title="Set LD_ENABLE_LIVE_DATA=1 to enable. The demo mission always uses local fixtures.">
-          Live feed is off on this server.
-        </p>
+        <p className="muted small">The real-world feed is turned off on this server.</p>
       )}
       {data?.enabled && (
         <div className="livefeed-grid">
