@@ -87,13 +87,13 @@ export function DistanceChart({
         <path d={path(series.experiment)} fill="none" stroke={COLORS.experiment} strokeWidth={1.8} strokeDasharray="6 3" />
         {marks.map((m, i) => (
           <g key={i}>
-            <circle cx={x(m.t)} cy={y(m.km)} r={4} fill={m.scenario === 'baseline' ? COLORS.baseline : COLORS.experiment} stroke="#0b1016" />
+            <circle cx={x(m.t)} cy={y(m.km)} r={4} fill={m.scenario === 'baseline' ? COLORS.baseline : COLORS.experiment} stroke="#121416" />
             <text x={x(m.t) > W - 80 ? x(m.t) - 6 : x(m.t) + 6} textAnchor={x(m.t) > W - 80 ? 'end' : 'start'} y={y(m.km) + (m.scenario === 'baseline' ? -6 : 12)} className="tick strong">
               {m.scenario === 'baseline' ? 'B' : 'E'} {fmtKm(m.km)}
             </text>
           </g>
         ))}
-        {playheadSec >= v0 && playheadSec <= v1 && <line x1={x(playheadSec)} x2={x(playheadSec)} y1={pad.t} y2={H - pad.b} stroke="#e8edf5" strokeOpacity={0.6} />}
+        {playheadSec >= v0 && playheadSec <= v1 && <line x1={x(playheadSec)} x2={x(playheadSec)} y1={pad.t} y2={H - pad.b} stroke="#f7f1de" strokeOpacity={0.6} />}
       </svg>
       <figcaption>
         <span><i className="sw" style={{ background: COLORS.baseline }} /> Baseline</span>
@@ -156,7 +156,7 @@ export function EncounterInset({ snap, obj, traj, epochMs, tauSec, thresholdKm, 
         <line x1={X(0)} y1={Y(0)} x2={X(data.at.x)} y2={Y(data.at.y)} stroke={SAT_COLORS.approach} strokeWidth={1.5} />
         <circle cx={X(data.at.x)} cy={Y(data.at.y)} r={3.5} fill={SAT_COLORS.approach} />
         <path d={`M${X(0)},${Y(0) - 5} l4,8 h-8 z`} fill={color} />
-        <line x1={10} x2={10 + bar * sc} y1={S - 10} y2={S - 10} stroke="#e8edf5" strokeWidth={2} />
+        <line x1={10} x2={10 + bar * sc} y1={S - 10} y2={S - 10} stroke="#f7f1de" strokeWidth={2} />
         <text x={10} y={S - 15} className="tick">
           {bar} km
         </text>

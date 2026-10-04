@@ -40,11 +40,11 @@ function ShiftSlider() {
     <div>
       <div className="slider-wrap" data-tip="Drag to shift the experiment launch. Violet curve: site-to-plane angle at each shift">
         <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden="true">
-          <path d={area} fill="rgba(196,167,255,0.10)" />
+          <path d={area} fill="rgba(148,210,189,0.10)" />
           <path d={line} fill="none" stroke={COLORS.angle} strokeWidth={1.6} vectorEffect="non-scaling-stroke" />
           <line x1={x(0)} x2={x(0)} y1={0} y2={H} stroke={COLORS.baseline} strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
-          <line x1={x(winB)} x2={x(winB)} y1={0} y2={H} stroke="#eaf2ff" strokeOpacity={0.5} strokeDasharray="3 3" strokeWidth={1} vectorEffect="non-scaling-stroke" />
-          <circle cx={x(off)} cy={y(angleAt)} r={4} fill={COLORS.angle} style={{ filter: 'drop-shadow(0 0 4px #c4a7ff)' }} vectorEffect="non-scaling-stroke" />
+          <line x1={x(winB)} x2={x(winB)} y1={0} y2={H} stroke="#f7f1de" strokeOpacity={0.5} strokeDasharray="3 3" strokeWidth={1} vectorEffect="non-scaling-stroke" />
+          <circle cx={x(off)} cy={y(angleAt)} r={4} fill={COLORS.angle} style={{ filter: 'drop-shadow(0 0 4px #94d2bd)' }} vectorEffect="non-scaling-stroke" />
         </svg>
         {dragging && (
           <div className="slider-bubble" style={{ left: `calc(${pct}% )` }}>
