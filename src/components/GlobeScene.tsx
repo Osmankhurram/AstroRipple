@@ -186,7 +186,7 @@ const atmosphereMaterial = () =>
     side: THREE.BackSide,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
-    uniforms: { c: { value: new THREE.Color('#8fa3c0') } },
+    uniforms: { c: { value: new THREE.Color('#c9c4b5') } },
     vertexShader: `varying vec3 vN; varying vec3 vV;
       void main(){ vec4 mv = modelViewMatrix*vec4(position,1.0); vN = normalize(normalMatrix*normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix*mv; }`,
     fragmentShader: `uniform vec3 c; varying vec3 vN; varying vec3 vV;
@@ -455,7 +455,7 @@ function SceneContents({ which, canvasId, showGhost, containerRef, overlayRef }:
 
       {/* Inertial frame: equator and rotation axis (subtle, toggleable). */}
       {st.view.showEquator && (
-        <Line points={unitCircle(128, 1.004).map(([x, y]) => [x, 0, -y] as [number, number, number])} color="#6f83a6" lineWidth={1} transparent opacity={0.4} />
+        <Line points={unitCircle(128, 1.004).map(([x, y]) => [x, 0, -y] as [number, number, number])} color="#8f8b80" lineWidth={1} transparent opacity={0.4} />
       )}
       {st.view.showAxis && <Line points={[[0, -1.45, 0], [0, 1.45, 0]]} color={COLORS.axis} lineWidth={1.2} dashed dashSize={0.05} gapSize={0.04} transparent opacity={0.55} />}
 
@@ -463,7 +463,7 @@ function SceneContents({ which, canvasId, showGhost, containerRef, overlayRef }:
         <OrbitPlane color={color} radius={radius} highlightRef={planeHighlight} />
         <mesh ref={sat}>
           <sphereGeometry args={[0.032, 16, 12]} />
-          <meshBasicMaterial color="#ffffff" />
+          <meshBasicMaterial color="#f7f1de" />
         </mesh>
       </group>
 
@@ -710,7 +710,7 @@ export function GlobeCanvas({ which, showGhost, label, active = true }: { which:
         gl={{ antialias: true, powerPreference: 'high-performance' }}
         raycaster={{ params: { Points: { threshold: 0.015 } } as never }}
       >
-        <color attach="background" args={['#04070c']} />
+        <color attach="background" args={['#08090a']} />
         <SceneContents which={which} canvasId={canvasId} showGhost={showGhost} containerRef={containerRef} overlayRef={overlayRef} />
       </Canvas>
       <div ref={overlayRef} className="scene-label angle-label angle-overlay" aria-hidden="true" />

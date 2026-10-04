@@ -2,12 +2,12 @@
 import type { SnapshotStatus } from '@/satellites/catalogs';
 
 export const SAT_COLORS = {
-  object: '#b8c4d6',
-  synthetic: '#d9a6ff',
-  selected: '#ffffff',
-  /** Distinct from baseline cyan / experiment amber: close-approach highlight (always paired with ◆ text). */
-  approach: '#ff5fd2',
-  trail: '#e8edf5',
+  object: '#c9c4b5',
+  synthetic: '#ca6702',
+  selected: '#f7f1de',
+  /** Distinct from baseline cyan / experiment orange: close-approach highlight (always paired with ◆ text). */
+  approach: '#e2553f',
+  trail: '#f7f1de',
 };
 
 export const LABELS = {

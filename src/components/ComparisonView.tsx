@@ -42,7 +42,7 @@ function Schematic({ which }: { which: ScenarioId }) {
   return (
     <div className="globe-canvas schematic">
       <svg viewBox="-160 -130 320 260" role="img" aria-label={`Schematic: site-to-plane angle ${m.siteToPlaneAngleDeg.toFixed(1)} degrees`}>
-        <circle r={R} fill="#0f2236" stroke="#5e6b86" />
+        <circle r={R} fill="#16181a" stroke="#8f8b80" />
         <line x1={-150} x2={150} y1={0} y2={0} stroke={color} strokeWidth={2} />
         <line x1={0} y1={0} x2={Math.cos(a) * 120} y2={-Math.sin(a) * 120} stroke={COLORS.angle} strokeWidth={1.5} />
         <circle cx={Math.cos(a) * R} cy={-Math.sin(a) * R} r={6} fill={color} />

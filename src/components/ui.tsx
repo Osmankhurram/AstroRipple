@@ -194,12 +194,12 @@ export function Logo({ size = 28 }: { size?: number }) {
         </mask>
       </defs>
       <g transform="rotate(-22 16 16)" fill="none" strokeWidth="1.3" strokeLinecap="round">
-        <path d={back} stroke="#dce7f3" strokeOpacity="0.4" />
+        <path d={back} stroke="#f7f1de" strokeOpacity="0.4" />
       </g>
-      <circle cx="16" cy="16" r="6.6" fill="#dce7f3" mask={`url(#${mask})`} />
+      <circle cx="16" cy="16" r="6.6" fill="#f7f1de" mask={`url(#${mask})`} />
       <g transform="rotate(-22 16 16)" fill="none" strokeWidth="1.3" strokeLinecap="round">
-        <path d={front} stroke="#dce7f3" strokeOpacity="0.9" />
-        <circle cx="26.3" cy="19.2" r="1.9" fill="#ff9f43" stroke="none" />
+        <path d={front} stroke="#f7f1de" strokeOpacity="0.9" />
+        <circle cx="26.3" cy="19.2" r="1.9" fill="#ee9b00" stroke="none" />
       </g>
     </svg>
   );
